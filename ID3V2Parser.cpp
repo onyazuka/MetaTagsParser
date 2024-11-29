@@ -1,13 +1,5 @@
 #include "ID3V2Parser.hpp"
 
-uint32_t swapU32(uint32_t number) {
-    return ((number & 0xff) << 24) | ((number & 0xff00) << 8) | ((number & 0xff0000) >> 8) | ((number & 0xff000000) >> 24);
-}
-
-uint16_t swapU16(uint16_t number) {
-    return ((number & 0xff) << 8) | ((number & 0xff00) >> 8);
-}
-
 std::string utf16ToUtf8(char* str, size_t n) {
     if (n % 2) {
         return "";
@@ -157,6 +149,77 @@ std::string utf8ToAscii(char* str, size_t n) {
     return res;
 }
 
+AsciiStrNullTerminated::Data AsciiStrNullTerminated::read(DataBlock& data) {
+    assert (data.size - data.offset);
+    size_t i = data.offset;
+    for (i = data.offset; i < data.size; ++i) {
+        if (data.data[i] == 0) {
+            break;
+        }
+    }
+    assert (i >= data.offset);
+    Data res = ID3V2Parser::asUtf8String_ascii(data.data + data.offset, i - data.offset);
+    data.offset = i + 1;
+    return res;
+}
+
+std::string decodeStr(uint8_t* data, size_t sz, Encoding encoding) {
+    std::string res;
+    switch (encoding) {
+    case Encoding::Ascii:
+        res = ID3V2Parser::asUtf8String_ascii(data, sz);
+    case Encoding::Utf16BOM:
+        res = ID3V2Parser::asUtf8String_utf16BOM(data, sz);
+    case Encoding::Utf16BE:
+        res = ID3V2Parser::asUtf8String_utf16BE(data, sz);
+    case Encoding::Utf8:
+        res = ID3V2Parser::asUtf8String_utf8(data, sz);
+    default:
+        ;
+    }
+    return res;
+}
+
+// encoding is USUALLY stored as 0 byte of frame, so this class is for those cases
+EncodedStrNullTerminated::Data EncodedStrNullTerminated::EncodedStrNullTerminated::read(DataBlock& data) {
+    assert (data.size - data.offset);
+    //Data res = asUtf8String(data.data + data.offset, n);
+    size_t i = data.offset;
+    for (i = data.offset; i < data.size; ++i) {
+        if (data.data[i] == 0) {
+            break;
+        }
+    }
+    assert (i >= data.offset);
+    Data res = decodeStr(data.data + data.offset, i - data.offset, Encoding(data.encoding));
+    if (data.encoding == Encoding::Utf16BE || data.encoding == Encoding::Utf16BOM) {
+        // \0\0
+        data.offset = i + 2;
+    }
+    else {
+        // \0
+        data.offset = i + 1;
+    }
+    return res;
+}
+
+BinaryData::Data BinaryData::read(DataBlock& data) {
+    assert (data.size - data.offset);
+    Data res{new uint8_t[data.size - data.offset], 0};
+    memcpy(res.first.get(), data.data + data.offset, data.size - data.offset);
+    res.second = data.size - data.offset;
+    return res;
+}
+
+EncodingByte::Data EncodingByte::read(DataBlock& data) {
+    assert (data.size - data.offset);
+    Data res;
+    res = (Encoding)(*(data.data + data.offset));
+    data.offset += sizeof(Encoding);
+    data.encoding = res;
+    return res;
+}
+
 ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     if (!checkFile(fs) || extractHeader(fs) || extractFrames(fs)) {
         throw std::runtime_error("invalid file");
@@ -189,7 +252,7 @@ bool ID3V2Extractor::checkFile(std::ifstream& fs) {
 int ID3V2Extractor::extractHeader(std::ifstream& fs) {
     fs.read((char*)&_flags, 1);
     fs.read((char*)&_size, 4);
-    _size = swapU32(_size);
+    _size = swapBytes<uint32_t>(_size);
     _size = (_size & 0b01111111) | ((_size & (0b01111111 << 8)) >> 1) | ((_size & (0b01111111 << 16)) >> 2) | ((_size & (0b01111111 << 24)) >> 3);
     return 0;
 }
@@ -215,8 +278,8 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     char ID[4];
     fs.read((char*)&ID[0], sizeof(ID));
     fs.read((char*)&frame, sizeof(frame.flags) + sizeof(frame.size));
-    frame.size = swapU32(frame.size);
-    frame.flags = swapU16(frame.flags);
+    frame.size = swapBytes<uint32_t>(frame.size);
+    frame.flags = swapBytes<uint16_t>(frame.flags);
     if (frame.size == 0) {
         return frame.size;
     }
@@ -238,50 +301,47 @@ std::string ID3V2Parser::asString(const std::string& title) {
 }
 
 std::string ID3V2Parser::asNString(const std::string& title) {
-    if (title.size() != 4 || title[0] != 'T') {
+    auto [data, size] = getFrameData(title);
+    if (!data || !size) {
         return "";
     }
-    const auto& frames = extractor.frames();
-    auto iter = frames.find(title);
-    if (iter == frames.end()) {
+    return asNString(data, size);
+}
+
+std::string ID3V2Parser::asNString(uint8_t* data, size_t n) {
+    if (data[0] != 0) {
         return "";
     }
-    auto frame = iter->second;
-    if (frame.data[0] != 0) {
-        return "";
-    }
-    std::string res((char*)&frame.data[1], frame.size - 1);
-    return res;
+    return std::string((char*)&data[1], n - 1);
 }
 
 std::basic_string<char16_t> ID3V2Parser::asUtf16LEString(const std::string& title) {
-    if (title.size() != 4 || title[0] != 'T') {
-        return u"";
+    auto [data, size] = getFrameData(title);
+    if (!data || !size) {
+        return {};
     }
-    const auto& frames = extractor.frames();
-    auto iter = frames.find(title);
-    if (iter == frames.end()) {
-        return u"";
-    }
-    auto frame = iter->second;
-    if (frame.data[0] != 1) {
+    return asUtf16LEString(data, size - 3);
+}
+
+std::basic_string<char16_t> ID3V2Parser::asUtf16LEString(uint8_t* data, size_t size) {
+    if (data[0] != 1) {
         return u"";
     }
     // bin endian - swapping bytes
-    if (frame.data[1] == 0xfe && frame.data[2] == 0xff) {
-        for (size_t i = 3; i < frame.size; i+=2) {
-            std::swap(frame.data[i], frame.data[i+1]);
+    if (data[1] == 0xfe && data[2] == 0xff) {
+        for (size_t i = 3; i < size; i+=2) {
+            std::swap(data[i], data[i+1]);
         }
     }
     // little endian - ok
-    else if (frame.data[1] == 0xff && frame.data[2] == 0xfe) {
+    else if (data[1] == 0xff && data[2] == 0xfe) {
         ;
     }
     // error - unknown encoding
     else {
         return u"";
     }
-    return std::basic_string<char16_t>((char16_t*)&frame.data[3], (frame.size - 3) / 2);
+    return std::basic_string<char16_t>((char16_t*)&data[3], (size - 3) / 2);
 }
 
 std::wstring ID3V2Parser::asUtf16LEWstring(const std::string& title) {
@@ -289,50 +349,92 @@ std::wstring ID3V2Parser::asUtf16LEWstring(const std::string& title) {
     return std::wstring((wchar_t*)str.data());
 }
 
+std::wstring ID3V2Parser::asUtf16LEWstring(uint8_t* data, size_t n) {
+    auto str = asUtf16LEString(data, n);
+    return std::wstring((wchar_t*)str.data());
+}
+
 std::string ID3V2Parser::asUtf8String(const std::string& title) {
-    if (title.size() != 4 || title[0] != 'T') {
+    auto [data, size] = getFrameData(title);
+    if (!data || !size) {
         return "";
+    }
+    return asUtf8String(data, size);
+}
+
+std::string ID3V2Parser::asUtf8String(uint8_t* data, size_t size) {
+    if (size <= 1) {
+        // empty string or just encoding without content
+        return "";
+    }
+    return asUtf8String(&data[1], size - 1, data[0]);
+}
+
+std::string ID3V2Parser::asUtf8String(uint8_t* data, size_t n, uint8_t encoding) {
+    switch (encoding) {
+    case 0:
+        return asUtf8String_ascii(data, n);
+    case 1:
+        return asUtf8String_utf16BOM(data, n);
+    case 2:
+        return asUtf8String_utf16BE(data, n);
+    case 3:
+        return asUtf8String_utf8(data, n);
+    default:
+        return "";
+    }
+}
+
+std::string ID3V2Parser::asUtf8String_ascii(uint8_t* data, size_t n) {
+    return asciiToUtf8((char*)data, n);
+}
+
+std::string ID3V2Parser::asUtf8String_utf16BOM(uint8_t* data, size_t size) {
+    // bin endian - swapping bytes
+    if (data[0] == 0xfe && data[1] == 0xff) {
+        for (size_t i = 2; i < size; i+=2) {
+            std::swap(data[i], data[i+1]);
+        }
+    }
+    // little endian - ok
+    else if (data[0] == 0xff && data[1] == 0xfe) {
+        ;
+    }
+    // error - unknown encoding
+    else {
+        return "";
+    }
+    return utf16ToUtf8((char*)&data[2], size - 2);
+}
+
+std::string ID3V2Parser::asUtf8String_utf16BE(uint8_t* data, size_t size) {
+    for (size_t i = 0; i < size; i+=2) {
+        std::swap(data[i], data[i+1]);
+    }
+    return utf16ToUtf8((char*)&data[0], size);
+}
+
+std::string ID3V2Parser::asUtf8String_utf8(uint8_t* data, size_t n) {
+    return std::string((char*)&data[0], n);
+}
+
+APICReader::ResultType ID3V2Parser::APIC() {
+    auto [data, size] = getFrameData("APIC");
+    if (!data || !size) {
+        return {};
+    }
+    return APICReader().read({data, size, 0});
+}
+
+std::pair<uint8_t*, size_t> ID3V2Parser::getFrameData(const std::string& title) {
+    if (title.size() != 4) {
+        return {nullptr, 0};
     }
     const auto& frames = extractor.frames();
     auto iter = frames.find(title);
     if (iter == frames.end()) {
-        return "";
+        return {nullptr, 0};
     }
     auto frame = iter->second;
-    // 0 - ascii
-    if (frame.data[0] == 0) {
-        return asciiToUtf8((char*)&frame.data[1], frame.size - 1);
-    }
-    // 1 - utf16 with BOM
-    if (frame.data[0] == 1) {
-        // bin endian - swapping bytes
-        if (frame.data[1] == 0xfe && frame.data[2] == 0xff) {
-            for (size_t i = 3; i < frame.size; i+=2) {
-                std::swap(frame.data[i], frame.data[i+1]);
-            }
-        }
-        // little endian - ok
-        else if (frame.data[1] == 0xff && frame.data[2] == 0xfe) {
-            ;
-        }
-        // error - unknown encoding
-        else {
-            return "";
-        }
-        return utf16ToUtf8((char*)&frame.data[3], frame.size - 3);
-    }
-    // 2 - utf16BE without BOM
-    else if (frame.data[0] == 2) {
-        for (size_t i = 1; i < frame.size; i+=2) {
-            std::swap(frame.data[i], frame.data[i+1]);
-        }
-        return utf16ToUtf8((char*)&frame.data[1], frame.size - 1);
-    }
-    // 3 - utf8
-    else if (frame.data[0] == 3) {
-        return std::string((char*)&frame.data[1], frame.size - 1);
-    }
-    else {
-        return "";
-    }
+    return {frame.data.get(), frame.size};
 }

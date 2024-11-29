@@ -32,9 +32,11 @@ int main()
 
     testParser();
     try {
-        //std::string path = "/home/onyazuka/01.Bokusatsu_Tenshi_Dokuro-chan.mp3";
-        //std::string path = "/home/onyazuka/鈴木このみ アスタロア.mp3";
-        std::string path = "e:/music/鈴木このみ アスタロア.mp3";
+        std::string home = "/home/onyazuka/";
+        //std::string path = home + "01.Bokusatsu_Tenshi_Dokuro-chan.mp3";
+        //std::string path = home + "鈴木このみ アスタロア.mp3";
+        std::string path = home + "#5 Marshall D. Teach (Ootsuka Akio) - NOW MY HANDS GET.mp3";
+        //std::string path = "e:/music/鈴木このみ アスタロア.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");
@@ -49,6 +51,9 @@ int main()
             if(title[0] == 'T') {
                 tags[title] = parser.asString(title);
             }
+            APICReader::ResultType apic = parser.APIC();
+            int kk = 0;
+            ++kk;
         }
         for (auto& [title, tag] : tags) {
             std::cout << title << ": " ;
