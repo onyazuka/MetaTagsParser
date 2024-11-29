@@ -30,11 +30,11 @@ void testParser() {
 int main()
 {
 
-    //testParser();
-
+    testParser();
     try {
         //std::string path = "/home/onyazuka/01.Bokusatsu_Tenshi_Dokuro-chan.mp3";
-        std::string path = "/home/onyazuka/鈴木このみ アスタロア.mp3";
+        //std::string path = "/home/onyazuka/鈴木このみ アスタロア.mp3";
+        std::string path = "e:/music/鈴木このみ アスタロア.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");
@@ -51,7 +51,8 @@ int main()
             }
         }
         for (auto& [title, tag] : tags) {
-            std::cout << title << ": " << tag << "\n";
+            std::cout << title << ": " ;
+            std::cout << tag << "\n";
         }
     }
     catch (std::runtime_error& err) {

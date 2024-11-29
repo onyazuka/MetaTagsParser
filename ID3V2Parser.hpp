@@ -39,6 +39,7 @@ public:
     std::string asString(const std::string& title);
     std::string asNString(const std::string& title);
     std::basic_string<char16_t> asUtf16LEString(const std::string& title);
+    std::wstring asUtf16LEWstring(const std::string& title);
     std::string asUtf8String(const std::string& title);
 private:
     ID3V2Extractor extractor;

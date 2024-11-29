@@ -222,7 +222,7 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
-    _frames[ID] = std::move(frame);
+    _frames[std::string(&ID[0], sizeof(ID))] = std::move(frame);
     return frame.size;
 }
 
@@ -282,6 +282,11 @@ std::basic_string<char16_t> ID3V2Parser::asUtf16LEString(const std::string& titl
         return u"";
     }
     return std::basic_string<char16_t>((char16_t*)&frame.data[3], (frame.size - 3) / 2);
+}
+
+std::wstring ID3V2Parser::asUtf16LEWstring(const std::string& title) {
+    auto str = asUtf16LEString(title);
+    return std::wstring((wchar_t*)str.data());
 }
 
 std::string ID3V2Parser::asUtf8String(const std::string& title) {
