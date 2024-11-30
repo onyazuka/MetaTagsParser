@@ -112,6 +112,7 @@ struct FrameReader {
 
 using APICReader = FrameReader<EncodingByte, AsciiStrNullTerminated, Byte, EncodedStrNullTerminated, BinaryData>;
 using TextualFrameReader = FrameReader<EncodingByte, EncodedStrNullTerminated>;
+using TXXXReader = FrameReader<EncodingByte, EncodedStrNullTerminated, EncodedStrNullTerminated>;
 using WUrlFrameReader = FrameReader<AsciiStrNullTerminated>;
 using WXXXReader = FrameReader<EncodingByte, EncodedStrNullTerminated, AsciiStrNullTerminated>;
 using COMMReader = FrameReader<EncodingByte, AsciiStrSized<3>, EncodedStrNullTerminated, EncodedStrNullTerminated>;
@@ -125,8 +126,7 @@ public:
         uint16_t flags = 0;
         Data data;
     };
-    using Frames = std::unordered_map<std::string, Frame>;
-    using FramesMultiple = std::unordered_map<std::string, std::list<Frame>>;
+    using Frames = std::unordered_map<std::string, std::list<Frame>>;
 
     class NoTagException : public std::exception {};
     class UnknownTagVersionException : public std::exception {};
@@ -150,7 +150,6 @@ private:
     int extractFrame(std::ifstream& fs);
     int extractFrameV22(std::ifstream& fs);
     Frames _frames;
-    FramesMultiple _framesMultiple;
     uint8_t _flags = 0;
     uint32_t _size = 0;
     uint8_t _version = 0;
@@ -176,17 +175,21 @@ public:
     static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
     static std::string asUtf8String_utf8(uint8_t* data, size_t n);
 
-    inline APICReader::ResultType APIC() { return readFrame<APICReader>("APIC"); }
+    inline std::list<APICReader::ResultType> APIC() { return readFrames<APICReader>("APIC"); }
     inline TextualFrameReader::ResultType Textual(const std::string& frameName) { return readFrame<TextualFrameReader>(frameName); }
-    inline WUrlFrameReader::ResultType WUrl(const std::string& frameName) { return readFrame<WUrlFrameReader>(frameName); }
-    inline WXXXReader::ResultType WXXX() { return readFrame<WXXXReader>("WXXX"); }
-    inline COMMReader::ResultType COMM() { return readFrame<COMMReader>("COMM"); }
+    inline std::list<TXXXReader::ResultType> TXXX() { return readFrames<TXXXReader>("TXXX"); }
+    inline std::list<WUrlFrameReader::ResultType> WUrl(const std::string& frameName) { return readFrames<WUrlFrameReader>(frameName); }
+    inline std::list<WXXXReader::ResultType> WXXX() { return readFrames<WXXXReader>("WXXX"); }
+    inline std::list<COMMReader::ResultType> COMM() { return readFrames<COMMReader>("COMM"); }
 
     template<typename ReaderType>
     typename ReaderType::ResultType readFrame(const std::string& frameName);
+    template<typename ReaderType>
+    std::list<typename ReaderType::ResultType> readFrames(const std::string& frameName);
 
 protected:
     std::pair<uint8_t*, size_t> getFrameData(const std::string& title);
+    std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string& title);
     ID3V2Extractor extractor;
 };
 
@@ -197,6 +200,16 @@ typename ReaderType::ResultType ID3V2Parser::readFrame(const std::string& frameN
         return {};
     }
     return ReaderType().read(DataBlock(data, size));
+}
+
+template<typename ReaderType>
+std::list<typename ReaderType::ResultType> ID3V2Parser::readFrames(const std::string& frameName) {
+    auto frames = getFramesData(frameName);
+    std::list<typename ReaderType::ResultType> res;
+    for (auto& [data, size] : frames) {
+        res.push_back(ReaderType().read(DataBlock(data, size)));
+    }
+    return res;
 }
 
 std::string utf16ToUtf8(char* str, size_t n);

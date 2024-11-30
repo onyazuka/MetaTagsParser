@@ -37,8 +37,8 @@ int main()
     //scout.dump("/home/onyazuka/taginfo.txt");
     try {
         std::string home = "/home/onyazuka/";
-        std::string path = home + "鈴木このみ アスタロア.mp3";
-        //std::string path = "/media/onyazuka/New SSD/music/WHY@DOLL 1月21日発売の4thシングル「サンライズ！～君がくれた希望～」MV (mp3cut.ru).mp3";
+        //std::string path = home + "鈴木このみ アスタロア.mp3";
+        std::string path = "/media/onyazuka/New SSD/music/all-for-you-genshin-impact-hoyofair2023-new-year.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");
@@ -50,7 +50,7 @@ int main()
         auto frames = extractor.frames();
         ID3V2Parser parser(std::move(extractor));
         for (auto& [title, frame] : frames) {
-            if(title[0] == 'T') {
+            if(title[0] == 'T' && (title != "TXXX")) {
                 tags[title] = std::get<1>(parser.Textual(title));
             }
             else if ((title[0] == 'W') && (title != "WXXX")) {
@@ -58,6 +58,7 @@ int main()
             }
         }
         APICReader::ResultType apic = parser.APIC();
+        auto txxx = parser.TXXX();
         auto wxxx = parser.WXXX();
         auto comm = parser.COMM();
         for (auto& [title, tag] : tags) {

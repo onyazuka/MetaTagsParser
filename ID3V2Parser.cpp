@@ -378,7 +378,7 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
-    _frames[std::string(&ID[0], sizeof(ID))] = std::move(frame);
+    _frames[std::string(&ID[0], sizeof(ID))].push_back(std::move(frame));
     return frame.size;
 }
 
@@ -398,7 +398,7 @@ int ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
     }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
-    _frames[std::string(&ID[0], sizeof(ID))] = std::move(frame);
+    _frames[std::string(&ID[0], sizeof(ID))].push_back(std::move(frame));
     return frame.size;
 }
 
@@ -538,5 +538,20 @@ std::pair<uint8_t*, size_t> ID3V2Parser::getFrameData(const std::string& title) 
         return {nullptr, 0};
     }
     auto frame = iter->second;
-    return {frame.data.get(), frame.size};
+    return {frame.front().data.get(), frame.front().size};
+}
+
+std::list<std::pair<uint8_t*, size_t>> ID3V2Parser::getFramesData(const std::string& title) {
+    const auto& frames = extractor.frames();
+    auto iter = frames.find(title);
+    if (iter == frames.end()) {
+        return {};
+    }
+    auto frame = iter->second;
+    std::list<std::pair<uint8_t*, size_t>> res;
+    while (!frame.empty()) {
+        res.push_back({frame.front().data.get(), frame.front().size});
+        frame.pop_front();
+    }
+    return res;
 }
