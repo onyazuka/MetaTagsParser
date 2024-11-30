@@ -3,6 +3,7 @@
 
 using namespace std;
 #include "ID3V2Parser.hpp"
+#include "util.hpp"
 
 void testUtfConverters() {
     std::string s1 = "neko";
@@ -31,11 +32,16 @@ int main()
 {
 
     testParser();
+    TagScout scout("/media/onyazuka/New SSD/music");
+    const auto& map = scout.map();
+    //scout.dump("/home/onyazuka/taginfo.txt");
     try {
         std::string home = "/home/onyazuka/";
         //std::string path = home + "01.Bokusatsu_Tenshi_Dokuro-chan.mp3";
         //std::string path = home + "鈴木このみ アスタロア.mp3";
-        std::string path = home + "#5 Marshall D. Teach (Ootsuka Akio) - NOW MY HANDS GET.mp3";
+        //std::string path = home + "#5 Marshall D. Teach (Ootsuka Akio) - NOW MY HANDS GET.mp3";
+        //std::string path = "/media/onyazuka/New SSD/music/Ayana Taketatsu/02 Rice To Meat You (ライスとぅミートゅー).mp3";
+        std::string path = "/media/onyazuka/New SSD/music/Ayana Taketatsu/Lyrical Concerto [www.love-melody.com]/12. Little＊Lion＊Heart.mp3";
         //std::string path = "e:/music/鈴木このみ アスタロア.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
@@ -49,12 +55,15 @@ int main()
         ID3V2Parser parser(std::move(extractor));
         for (auto& [title, frame] : frames) {
             if(title[0] == 'T') {
-                tags[title] = parser.asString(title);
+                tags[title] = std::get<1>(parser.Textual(title));
             }
-            APICReader::ResultType apic = parser.APIC();
-            int kk = 0;
-            ++kk;
+            else if ((title[0] == 'W') && (title != "WXXX")) {
+                tags[title] = std::get<0>(parser.WUrl(title));
+            }
         }
+        APICReader::ResultType apic = parser.APIC();
+        auto wxxx = parser.WXXX();
+        auto comm = parser.COMM();
         for (auto& [title, tag] : tags) {
             std::cout << title << ": " ;
             std::cout << tag << "\n";

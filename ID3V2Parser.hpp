@@ -34,6 +34,7 @@ enum class Encoding : uint8_t{
 };
 
 struct DataBlock {
+    DataBlock(uint8_t* data, size_t size);
     uint8_t* data = 0;
     size_t size = 0;
     size_t offset = 0;
@@ -45,10 +46,28 @@ struct AsciiStrNullTerminated {
     Data read(DataBlock& data);
 };
 
+template<size_t N>
+struct AsciiStrSized {
+    using Data = std::string;
+    Data read(DataBlock& data) {
+        assert ((data.size - data.offset) >= N);
+        std::string res((char*)data.data + data.offset, N);
+        data.offset += N;
+        return res;
+    }
+};
 
 std::string decodeStr(uint8_t* data, size_t sz, Encoding encoding);
 
+// Encoded string with null terminator of unknown length
 class EncodedStrNullTerminated {
+public:
+    using Data = std::string;
+    Data read(DataBlock& data);
+};
+
+// Encoded string of KNOWN length (data.size)
+class EncodedStr {
 public:
     using Data = std::string;
     Data read(DataBlock& data);
@@ -92,6 +111,10 @@ struct FrameReader {
 };
 
 using APICReader = FrameReader<EncodingByte, AsciiStrNullTerminated, Byte, EncodedStrNullTerminated, BinaryData>;
+using TextualFrameReader = FrameReader<EncodingByte, EncodedStrNullTerminated>;
+using WUrlFrameReader = FrameReader<AsciiStrNullTerminated>;
+using WXXXReader = FrameReader<EncodingByte, EncodedStrNullTerminated, AsciiStrNullTerminated>;
+using COMMReader = FrameReader<EncodingByte, AsciiStrSized<3>, EncodedStrNullTerminated, EncodedStrNullTerminated>;
 
 
 class ID3V2Extractor {
@@ -110,20 +133,31 @@ public:
     inline bool unsynchronisation() const { return _flags & ((uint8_t)1<<7); }
     inline bool extendedHeader() const { return _flags & ((uint8_t)1<<6); }
     inline bool experimental() const { return _flags & ((uint8_t)1<<5); }
+    inline bool hasFooter() const { return (_version == 4) && (_flags & ((uint8_t)1 << 4) ); }
+    inline uint8_t version() const { return _version; }
 private:
     bool checkFile(std::ifstream& fs);
     int extractHeader(std::ifstream& fs);
     int extractFrames(std::ifstream& fs);
+    int extractFramesFooter(std::ifstream& fs);
     int extractFrame(std::ifstream& fs);
     Frames _frames;
     uint8_t _flags = 0;
     uint32_t _size = 0;
+    uint8_t _version = 0;
 };
 
 
 class ID3V2Parser {
 public:
     ID3V2Parser(ID3V2Extractor&& extractor);
+    APICReader::ResultType APIC();
+    TextualFrameReader::ResultType Textual(const std::string& frameName);
+    WUrlFrameReader::ResultType WUrl(const std::string& frameName);
+    WXXXReader::ResultType WXXX();
+    COMMReader::ResultType COMM();
+
+
     std::string asString(const std::string& title);
     std::string asNString(const std::string& title);
     static std::string asNString(uint8_t* data, size_t n);
@@ -138,7 +172,7 @@ public:
     static std::string asUtf8String_utf16BOM(uint8_t* data, size_t n);
     static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
     static std::string asUtf8String_utf8(uint8_t* data, size_t n);
-    APICReader::ResultType APIC();
+
 private:
     std::pair<uint8_t*, size_t> getFrameData(const std::string& title);
     ID3V2Extractor extractor;

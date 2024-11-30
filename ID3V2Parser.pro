@@ -5,7 +5,9 @@ CONFIG -= qt
 
 SOURCES += \
         ID3V2Parser.cpp \
-        main.cpp
+        main.cpp \
+        util.cpp
 
 HEADERS += \
-    ID3V2Parser.hpp
+    ID3V2Parser.hpp \
+    util.hpp

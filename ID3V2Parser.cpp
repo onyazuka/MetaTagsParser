@@ -149,8 +149,17 @@ std::string utf8ToAscii(char* str, size_t n) {
     return res;
 }
 
+DataBlock::DataBlock(uint8_t* data, size_t size)
+    : data{data}, size{size}, offset{0}, encoding{Encoding::Ascii}
+{
+    ;
+}
+
 AsciiStrNullTerminated::Data AsciiStrNullTerminated::read(DataBlock& data) {
-    assert (data.size - data.offset);
+    assert (((int64_t)data.size - (int64_t)data.offset) >= 0);
+    if ((data.size - data.offset) == 0) {
+        return Data{};
+    }
     size_t i = data.offset;
     for (i = data.offset; i < data.size; ++i) {
         if (data.data[i] == 0) {
@@ -164,30 +173,40 @@ AsciiStrNullTerminated::Data AsciiStrNullTerminated::read(DataBlock& data) {
 }
 
 std::string decodeStr(uint8_t* data, size_t sz, Encoding encoding) {
-    std::string res;
     switch (encoding) {
     case Encoding::Ascii:
-        res = ID3V2Parser::asUtf8String_ascii(data, sz);
+        return ID3V2Parser::asUtf8String_ascii(data, sz);
     case Encoding::Utf16BOM:
-        res = ID3V2Parser::asUtf8String_utf16BOM(data, sz);
+        return ID3V2Parser::asUtf8String_utf16BOM(data, sz);
     case Encoding::Utf16BE:
-        res = ID3V2Parser::asUtf8String_utf16BE(data, sz);
+        return ID3V2Parser::asUtf8String_utf16BE(data, sz);
     case Encoding::Utf8:
-        res = ID3V2Parser::asUtf8String_utf8(data, sz);
+        return ID3V2Parser::asUtf8String_utf8(data, sz);
     default:
         ;
     }
-    return res;
 }
 
-// encoding is USUALLY stored as 0 byte of frame, so this class is for those cases
+// !!!encoding stored in data!!!
 EncodedStrNullTerminated::Data EncodedStrNullTerminated::EncodedStrNullTerminated::read(DataBlock& data) {
-    assert (data.size - data.offset);
+    assert (((int64_t)data.size - (int64_t)data.offset) >= 0);
+    if ((data.size - data.offset) == 0) {
+        return Data{};
+    }
     //Data res = asUtf8String(data.data + data.offset, n);
     size_t i = data.offset;
-    for (i = data.offset; i < data.size; ++i) {
-        if (data.data[i] == 0) {
-            break;
+    if (data.encoding == Encoding::Utf16BE || data.encoding == Encoding::Utf16BOM) {
+        for (i = data.offset; i < data.size; i += 2) {
+            if (*((char16_t*)(data.data + i)) == 0) {
+                break;
+            }
+        }
+    }
+    else {
+        for (i = data.offset; i < data.size; ++i) {
+            if (data.data[i] == 0) {
+                break;
+            }
         }
     }
     assert (i >= data.offset);
@@ -203,8 +222,29 @@ EncodedStrNullTerminated::Data EncodedStrNullTerminated::EncodedStrNullTerminate
     return res;
 }
 
+EncodedStr::Data EncodedStr::read(DataBlock& data) {
+    assert (((int64_t)data.size - (int64_t)data.offset) >= 0);
+    if ((data.size - data.offset) == 0) {
+        return Data{};
+    }
+    size_t i = data.offset;
+    Data res = decodeStr(data.data + data.offset, data.size - data.offset - ((data.size - data.offset) % 2), Encoding(data.encoding));
+    if (data.encoding == Encoding::Utf16BE || data.encoding == Encoding::Utf16BOM) {
+        // \0\0
+        data.offset = i + 2;
+    }
+    else {
+        // \0
+        data.offset = i + 1;
+    }
+    return res;
+}
+
 BinaryData::Data BinaryData::read(DataBlock& data) {
-    assert (data.size - data.offset);
+    assert (((int64_t)data.size - (int64_t)data.offset) >= 0);
+    if ((data.size - data.offset) == 0) {
+        return Data{};
+    }
     Data res{new uint8_t[data.size - data.offset], 0};
     memcpy(res.first.get(), data.data + data.offset, data.size - data.offset);
     res.second = data.size - data.offset;
@@ -221,9 +261,22 @@ EncodingByte::Data EncodingByte::read(DataBlock& data) {
 }
 
 ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
-    if (!checkFile(fs) || extractHeader(fs) || extractFrames(fs)) {
+    if (!checkFile(fs)) {
         throw std::runtime_error("invalid file");
     }
+    //while (true) {
+        if (extractHeader(fs)) {
+            throw std::runtime_error("invalid file");
+        }
+        /*if (auto iter = _frames.find("SEEK"); iter != _frames.end()) {
+            if (iter->second.size != 4) {
+                throw std::runtime_error("invalid file");
+            }
+            uint32_t nextOffset = *(uint32_t*)iter->second.data.get();
+            nextOffset = swapBytes(nextOffset);
+
+        }*/
+    //}
     if (unsynchronisation()) {
         throw std::runtime_error("unsupported file: unsynchronization");
     }
@@ -238,13 +291,18 @@ ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
 bool ID3V2Extractor::checkFile(std::ifstream& fs) {
     std::unique_ptr<uint8_t[]> data(new uint8_t[5]);
     fs.read((char*)data.get(), 5);
+    _version = data[3];
+    if (_version == 4) {
+        int kk = 0;
+        ++kk;
+    }
     // 0x49 0x44 0x33 - ID3 string
     // 0x03 0x00 - version
     return
         data[0] == 0x49 &&
         data[1] == 0x44 &&
         data[2] == 0x33 &&
-        data[3] == 0x03  &&
+        (data[3] == 0x03 || data[3] == 0x04)  &&
         data[4] == 0x00;
 
 }
@@ -258,7 +316,7 @@ int ID3V2Extractor::extractHeader(std::ifstream& fs) {
 }
 
 int ID3V2Extractor::extractFrames(std::ifstream& fs) {
-    size_t offset = 0;
+    size_t offset = hasFooter() ? 20 : 10;
     while (offset < _size) {
         int nbytes = extractFrame(fs);
         if (nbytes <= 0) {
@@ -270,7 +328,18 @@ int ID3V2Extractor::extractFrames(std::ifstream& fs) {
             return -1;
         }
     }
+    if (_version == 4) {
+        int kk = 0;
+        ++kk;
+    }
+    /*if ((_version == 4) && hasFooter()) {
+        extractFramesFooter(fs);
+    }*/
     return 0;
+}
+
+int ID3V2Extractor::extractFramesFooter(std::ifstream& fs) {
+
 }
 
 int ID3V2Extractor::extractFrame(std::ifstream& fs) {
@@ -423,7 +492,39 @@ APICReader::ResultType ID3V2Parser::APIC() {
     if (!data || !size) {
         return {};
     }
-    return APICReader().read({data, size, 0});
+    return APICReader().read(DataBlock(data, size));
+}
+
+TextualFrameReader::ResultType ID3V2Parser::Textual(const std::string& frameName) {
+    auto [data, size] = getFrameData(frameName);
+    if (!data || !size) {
+        return {};
+    }
+    return TextualFrameReader().read(DataBlock(data, size));
+}
+
+WUrlFrameReader::ResultType ID3V2Parser::WUrl(const std::string& frameName) {
+    auto [data, size] = getFrameData(frameName);
+    if (!data || !size) {
+        return {};
+    }
+    return WUrlFrameReader().read(DataBlock(data, size));
+}
+
+WXXXReader::ResultType ID3V2Parser::WXXX() {
+    auto [data, size] = getFrameData("WXXX");
+    if (!data || !size) {
+        return {};
+    }
+    return WXXXReader().read(DataBlock(data, size));
+}
+
+COMMReader::ResultType ID3V2Parser::COMM() {
+    auto [data, size] = getFrameData("COMM");
+    if (!data || !size) {
+        return {};
+    }
+    return COMMReader().read(DataBlock(data, size));
 }
 
 std::pair<uint8_t*, size_t> ID3V2Parser::getFrameData(const std::string& title) {
