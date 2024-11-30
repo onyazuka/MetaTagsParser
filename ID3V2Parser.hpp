@@ -121,8 +121,8 @@ class ID3V2Extractor {
 public:
     using Data = std::shared_ptr<uint8_t[]>;
     struct Frame {
-        uint32_t size;
-        uint16_t flags;
+        uint32_t size = 0;
+        uint16_t flags = 0;
         Data data;
     };
     using Frames = std::unordered_map<std::string, Frame>;
@@ -147,6 +147,7 @@ private:
     int extractFrames(std::ifstream& fs);
     int extractFramesFooter(std::ifstream& fs);
     int extractFrame(std::ifstream& fs);
+    int extractFrameV22(std::ifstream& fs);
     Frames _frames;
     uint8_t _flags = 0;
     uint32_t _size = 0;
@@ -157,12 +158,6 @@ private:
 class ID3V2Parser {
 public:
     ID3V2Parser(ID3V2Extractor&& extractor);
-    APICReader::ResultType APIC();
-    TextualFrameReader::ResultType Textual(const std::string& frameName);
-    WUrlFrameReader::ResultType WUrl(const std::string& frameName);
-    WXXXReader::ResultType WXXX();
-    COMMReader::ResultType COMM();
-
 
     std::string asString(const std::string& title);
     std::string asNString(const std::string& title);
@@ -179,10 +174,28 @@ public:
     static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
     static std::string asUtf8String_utf8(uint8_t* data, size_t n);
 
-private:
+    inline APICReader::ResultType APIC() { return readFrame<APICReader>("APIC"); }
+    inline TextualFrameReader::ResultType Textual(const std::string& frameName) { return readFrame<TextualFrameReader>(frameName); }
+    inline WUrlFrameReader::ResultType WUrl(const std::string& frameName) { return readFrame<WUrlFrameReader>(frameName); }
+    inline WXXXReader::ResultType WXXX() { return readFrame<WXXXReader>("WXXX"); }
+    inline COMMReader::ResultType COMM() { return readFrame<COMMReader>("COMM"); }
+
+    template<typename ReaderType>
+    typename ReaderType::ResultType readFrame(const std::string& frameName);
+
+protected:
     std::pair<uint8_t*, size_t> getFrameData(const std::string& title);
     ID3V2Extractor extractor;
 };
+
+template<typename ReaderType>
+typename ReaderType::ResultType ID3V2Parser::readFrame(const std::string& frameName) {
+    auto [data, size] = getFrameData(frameName);
+    if (!data || !size) {
+        return {};
+    }
+    return ReaderType().read(DataBlock(data, size));
+}
 
 std::string utf16ToUtf8(char* str, size_t n);
 std::string asciiToUtf8(char* str, size_t n);

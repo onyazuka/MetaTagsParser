@@ -311,7 +311,7 @@ bool ID3V2Extractor::checkFile(std::ifstream& fs) {
         data[0] == 0x49 &&
         data[1] == 0x44 &&
         data[2] == 0x33 &&
-        (data[3] == 0x03 || data[3] == 0x04)  &&
+        (data[3] == 0x02 || data[3] == 0x03 || data[3] == 0x04)  &&
         data[4] == 0x00;
     if (!valid) {
         if ((data[0] == 0xff && data[1] == 0xfb) || (data[0] == 0x00)) {
@@ -322,7 +322,7 @@ bool ID3V2Extractor::checkFile(std::ifstream& fs) {
             // not id3 tag at all, but may be tag of some other type
             throw UnknownTagException{};
         }
-        if (data[3] != 0x03 && data[3] != 0x04) {
+        if (data[3] != 0x02 && data[3] != 0x03 && data[3] != 0x04) {
             throw UnknownTagVersionException{};
         }
     }
@@ -340,7 +340,7 @@ int ID3V2Extractor::extractHeader(std::ifstream& fs) {
 int ID3V2Extractor::extractFrames(std::ifstream& fs) {
     size_t offset = hasFooter() ? 20 : 10;
     while (offset < _size) {
-        int nbytes = extractFrame(fs);
+        int nbytes = _version == 2 ? extractFrameV22(fs) : extractFrame(fs);
         if (nbytes <= 0) {
             // error or PADDING
             return nbytes;
@@ -361,7 +361,7 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     Frame frame;
     char ID[4];
     fs.read((char*)&ID[0], sizeof(ID));
-    fs.read((char*)&frame, sizeof(frame.flags) + sizeof(frame.size));
+    fs.read((char*)&frame.size, sizeof(frame.flags) + sizeof(frame.size));
     frame.size = swapBytes<uint32_t>(frame.size);
     frame.flags = swapBytes<uint16_t>(frame.flags);
     if (frame.size == 0) {
@@ -370,6 +370,22 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     // in id3v2.4 size of frame is also SYNCSAFE, like header (but NOT like frame size in id3v2.3)
     if (_version == 4) {
         frame.size = syncSafe(frame.size);
+    }
+    frame.data = Data(new uint8_t[frame.size]);
+    fs.read((char*)frame.data.get(), frame.size);
+    _frames[std::string(&ID[0], sizeof(ID))] = std::move(frame);
+    return frame.size;
+}
+
+int ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
+    Frame frame;
+    char ID[3];
+    fs.read((char*)&ID[0], sizeof(ID));
+    fs.read((char*)&frame.size, 3);
+    // swapping 3 bytes in place
+    frame.size = ((frame.size & 0xff) << 16) | ((frame.size & 0xff00)) | ((frame.size & 0xff0000) >> 16);
+    if (frame.size == 0) {
+        return frame.size;
     }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
@@ -506,50 +522,7 @@ std::string ID3V2Parser::asUtf8String_utf8(uint8_t* data, size_t n) {
     return std::string((char*)&data[0], n);
 }
 
-APICReader::ResultType ID3V2Parser::APIC() {
-    auto [data, size] = getFrameData("APIC");
-    if (!data || !size) {
-        return {};
-    }
-    return APICReader().read(DataBlock(data, size));
-}
-
-TextualFrameReader::ResultType ID3V2Parser::Textual(const std::string& frameName) {
-    auto [data, size] = getFrameData(frameName);
-    if (!data || !size) {
-        return {};
-    }
-    return TextualFrameReader().read(DataBlock(data, size));
-}
-
-WUrlFrameReader::ResultType ID3V2Parser::WUrl(const std::string& frameName) {
-    auto [data, size] = getFrameData(frameName);
-    if (!data || !size) {
-        return {};
-    }
-    return WUrlFrameReader().read(DataBlock(data, size));
-}
-
-WXXXReader::ResultType ID3V2Parser::WXXX() {
-    auto [data, size] = getFrameData("WXXX");
-    if (!data || !size) {
-        return {};
-    }
-    return WXXXReader().read(DataBlock(data, size));
-}
-
-COMMReader::ResultType ID3V2Parser::COMM() {
-    auto [data, size] = getFrameData("COMM");
-    if (!data || !size) {
-        return {};
-    }
-    return COMMReader().read(DataBlock(data, size));
-}
-
 std::pair<uint8_t*, size_t> ID3V2Parser::getFrameData(const std::string& title) {
-    if (title.size() != 4) {
-        return {nullptr, 0};
-    }
     const auto& frames = extractor.frames();
     auto iter = frames.find(title);
     if (iter == frames.end()) {
