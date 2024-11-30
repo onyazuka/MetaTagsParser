@@ -37,12 +37,8 @@ int main()
     //scout.dump("/home/onyazuka/taginfo.txt");
     try {
         std::string home = "/home/onyazuka/";
-        //std::string path = home + "01.Bokusatsu_Tenshi_Dokuro-chan.mp3";
         //std::string path = home + "鈴木このみ アスタロア.mp3";
-        //std::string path = home + "#5 Marshall D. Teach (Ootsuka Akio) - NOW MY HANDS GET.mp3";
-        //std::string path = "/media/onyazuka/New SSD/music/Ayana Taketatsu/02 Rice To Meat You (ライスとぅミートゅー).mp3";
-        std::string path = "/media/onyazuka/New SSD/music/Ayana Taketatsu/Lyrical Concerto [www.love-melody.com]/12. Little＊Lion＊Heart.mp3";
-        //std::string path = "e:/music/鈴木このみ アスタロア.mp3";
+        std::string path = "/media/onyazuka/New SSD/music/Дискография Golden Bomber/[2010] Golden Hour -Kamihanki Best 2010-/06 Dakara baibai.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");

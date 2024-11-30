@@ -127,6 +127,12 @@ public:
     };
     using Frames = std::unordered_map<std::string, Frame>;
 
+    class NoTagException : public std::exception {};
+    class UnknownTagVersionException : public std::exception {};
+    class InvalidTagException : public std::exception {};
+    class UnknownTagException : public std::exception {};
+    class NotImplementedException : public std::exception {};
+
     ID3V2Extractor(std::ifstream& fs);
     inline Frames& frames() { return _frames; }
     inline uint32_t size() const { return _size; }

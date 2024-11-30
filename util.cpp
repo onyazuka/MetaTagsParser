@@ -6,6 +6,13 @@ namespace fs = std::filesystem;
 TagScout::TagScout(const std::filesystem::path& path) {
     for (const fs::directory_entry& entry : fs::recursive_directory_iterator(path)) {
         try {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            auto extension = entry.path().extension();
+            if (!(extension == ".mp3" || extension == ".flac")) {
+                continue;
+            }
             std::ifstream ifs(entry.path(), std::ios_base::binary);
             if (!ifs) {
                 continue;
@@ -19,8 +26,16 @@ TagScout::TagScout(const std::filesystem::path& path) {
                 framePathMap["v4"].push_back(entry.path().string());
             }
         }
-        catch (...) {
+        catch (ID3V2Extractor::NoTagException) {
+            // not a error, just no tag
             continue;
+        }
+        catch (ID3V2Extractor::UnknownTagException) {
+            // not a error, just unknown tag
+            continue;
+        }
+        catch (...) {
+            framePathMap["error"].push_back(entry.path().string());
         }
     }
 }

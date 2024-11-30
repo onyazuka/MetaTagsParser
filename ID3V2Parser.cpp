@@ -1,5 +1,9 @@
 #include "ID3V2Parser.hpp"
 
+uint32_t syncSafe(uint32_t n) {
+    return (n & 0b01111111) | ((n & (0b01111111 << 8)) >> 1) | ((n & (0b01111111 << 16)) >> 2) | ((n & (0b01111111 << 24)) >> 3);
+}
+
 std::string utf16ToUtf8(char* str, size_t n) {
     if (n % 2) {
         return "";
@@ -262,11 +266,11 @@ EncodingByte::Data EncodingByte::read(DataBlock& data) {
 
 ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     if (!checkFile(fs)) {
-        throw std::runtime_error("invalid file");
+        throw InvalidTagException{};
     }
     //while (true) {
         if (extractHeader(fs)) {
-            throw std::runtime_error("invalid file");
+            throw InvalidTagException{};
         }
         /*if (auto iter = _frames.find("SEEK"); iter != _frames.end()) {
             if (iter->second.size != 4) {
@@ -278,13 +282,21 @@ ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
         }*/
     //}
     if (unsynchronisation()) {
-        throw std::runtime_error("unsupported file: unsynchronization");
+        //throw std::runtime_error("unsupported file: unsynchronization");
+        // ignoring - should not have influence on correct work
     }
     if (extendedHeader()) {
-        throw std::runtime_error("unsupported file: extended headers");
+        //throw std::runtime_error("unsupported file: extended headers");
+        // ignoring - should not have influence on correct work
     }
     if (extractFrames(fs)) {
-        throw std::runtime_error("unsupported file: invalid tags");
+        throw InvalidTagException{};
+    }
+    if ((_version == 4) && hasFooter()) {
+        throw NotImplementedException{};
+    }
+    if ((_version == 4) && _frames.find("SEEK") != _frames.end()) {
+        throw NotImplementedException{};
     }
 }
 
@@ -292,26 +304,36 @@ bool ID3V2Extractor::checkFile(std::ifstream& fs) {
     std::unique_ptr<uint8_t[]> data(new uint8_t[5]);
     fs.read((char*)data.get(), 5);
     _version = data[3];
-    if (_version == 4) {
-        int kk = 0;
-        ++kk;
-    }
+
     // 0x49 0x44 0x33 - ID3 string
     // 0x03 0x00 - version
-    return
+    bool valid =
         data[0] == 0x49 &&
         data[1] == 0x44 &&
         data[2] == 0x33 &&
         (data[3] == 0x03 || data[3] == 0x04)  &&
         data[4] == 0x00;
-
+    if (!valid) {
+        if ((data[0] == 0xff && data[1] == 0xfb) || (data[0] == 0x00)) {
+            // sync bytes or some padding
+            throw NoTagException{};
+        }
+        else if (!(data[0] == 0x49 && data[1] == 0x44 && data[2] == 0x33)) {
+            // not id3 tag at all, but may be tag of some other type
+            throw UnknownTagException{};
+        }
+        if (data[3] != 0x03 && data[3] != 0x04) {
+            throw UnknownTagVersionException{};
+        }
+    }
+    return valid;
 }
 
 int ID3V2Extractor::extractHeader(std::ifstream& fs) {
     fs.read((char*)&_flags, 1);
     fs.read((char*)&_size, 4);
     _size = swapBytes<uint32_t>(_size);
-    _size = (_size & 0b01111111) | ((_size & (0b01111111 << 8)) >> 1) | ((_size & (0b01111111 << 16)) >> 2) | ((_size & (0b01111111 << 24)) >> 3);
+    _size = syncSafe(_size);
     return 0;
 }
 
@@ -328,18 +350,11 @@ int ID3V2Extractor::extractFrames(std::ifstream& fs) {
             return -1;
         }
     }
-    if (_version == 4) {
-        int kk = 0;
-        ++kk;
-    }
-    /*if ((_version == 4) && hasFooter()) {
-        extractFramesFooter(fs);
-    }*/
     return 0;
 }
 
-int ID3V2Extractor::extractFramesFooter(std::ifstream& fs) {
-
+int ID3V2Extractor::extractFramesFooter(std::ifstream&) {
+    return 0;
 }
 
 int ID3V2Extractor::extractFrame(std::ifstream& fs) {
@@ -351,6 +366,10 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     frame.flags = swapBytes<uint16_t>(frame.flags);
     if (frame.size == 0) {
         return frame.size;
+    }
+    // in id3v2.4 size of frame is also SYNCSAFE, like header (but NOT like frame size in id3v2.3)
+    if (_version == 4) {
+        frame.size = syncSafe(frame.size);
     }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
