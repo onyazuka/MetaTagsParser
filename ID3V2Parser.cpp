@@ -314,7 +314,7 @@ bool ID3V2Extractor::checkFile(std::ifstream& fs) {
         (data[3] == 0x02 || data[3] == 0x03 || data[3] == 0x04)  &&
         data[4] == 0x00;
     if (!valid) {
-        if ((data[0] == 0xff && data[1] == 0xfb) || (data[0] == 0x00)) {
+        if ((data[0] == 0xff && ((data[1] & 0b11100000) == 0b11100000)) || (data[0] == 0x00)) {
             // sync bytes or some padding
             throw NoTagException{};
         }
@@ -347,6 +347,7 @@ int ID3V2Extractor::extractFrames(std::ifstream& fs) {
         }
         offset += nbytes;
         if (offset > _size) {
+            // invalid tag, but some already read data may be useful
             return -1;
         }
     }
@@ -361,6 +362,10 @@ int ID3V2Extractor::extractFrame(std::ifstream& fs) {
     Frame frame;
     char ID[4];
     fs.read((char*)&ID[0], sizeof(ID));
+    if (ID[0] == 0) {
+        // padding?
+        return 0;
+    }
     fs.read((char*)&frame.size, sizeof(frame.flags) + sizeof(frame.size));
     frame.size = swapBytes<uint32_t>(frame.size);
     frame.flags = swapBytes<uint16_t>(frame.flags);
@@ -381,6 +386,10 @@ int ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
     Frame frame;
     char ID[3];
     fs.read((char*)&ID[0], sizeof(ID));
+    if (ID[0] == 0) {
+        // padding?
+        return 0;
+    }
     fs.read((char*)&frame.size, 3);
     // swapping 3 bytes in place
     frame.size = ((frame.size & 0xff) << 16) | ((frame.size & 0xff00)) | ((frame.size & 0xff0000) >> 16);

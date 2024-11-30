@@ -8,7 +8,7 @@
 #include <cassert>
 #include <concepts>
 #include <string.h>
-#include <algorithm>
+#include <list>
 
 template<std::unsigned_integral T>
 T swapBytes(T n) {
@@ -126,6 +126,7 @@ public:
         Data data;
     };
     using Frames = std::unordered_map<std::string, Frame>;
+    using FramesMultiple = std::unordered_map<std::string, std::list<Frame>>;
 
     class NoTagException : public std::exception {};
     class UnknownTagVersionException : public std::exception {};
@@ -149,6 +150,7 @@ private:
     int extractFrame(std::ifstream& fs);
     int extractFrameV22(std::ifstream& fs);
     Frames _frames;
+    FramesMultiple _framesMultiple;
     uint8_t _flags = 0;
     uint32_t _size = 0;
     uint8_t _version = 0;

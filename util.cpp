@@ -32,6 +32,11 @@ TagScout::TagScout(const std::filesystem::path& path) {
         }
         catch (ID3V2Extractor::UnknownTagException) {
             // not a error, just unknown tag
+            framePathMap["unknown"].push_back(entry.path().string());
+            continue;
+        }
+        catch (ID3V2Extractor::InvalidTagException) {
+            // tag is invalid, but some data may be ok
             continue;
         }
         catch (...) {
