@@ -3,7 +3,10 @@
 
 using namespace std;
 #include "ID3V2Parser.hpp"
-#include "util.hpp"
+#include "TagScout.hpp"
+
+using namespace util;
+using namespace tag::id3v2;
 
 void testUtfConverters() {
     std::string s1 = "neko";
@@ -32,8 +35,8 @@ int main()
 {
 
     testParser();
-    //TagScout scout("/media/onyazuka/New SSD/music");
-    //const auto& map = scout.map();
+    TagScout scout("/media/onyazuka/New SSD/music");
+    const auto& map = scout.map();
     //scout.dump("/home/onyazuka/taginfo.txt");
     try {
         std::string home = "/home/onyazuka/";
