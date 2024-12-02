@@ -289,7 +289,10 @@ ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
         //throw std::runtime_error("unsupported file: extended headers");
         // ignoring - should not have influence on correct work
     }
-    if (extractFrames(fs)) {
+    bool error = extractFrames(fs);
+    // leaving fs in state, convenient for later work (on actual audio data)
+    fs.seekg((hasFooter() ? 20 : 10) + _size, std::ios_base::beg);
+    if (error) {
         throw InvalidTagException{};
     }
     if ((_version == 4) && hasFooter()) {

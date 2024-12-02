@@ -32,13 +32,13 @@ int main()
 {
 
     testParser();
-    TagScout scout("/media/onyazuka/New SSD/music");
-    const auto& map = scout.map();
+    //TagScout scout("/media/onyazuka/New SSD/music");
+    //const auto& map = scout.map();
     //scout.dump("/home/onyazuka/taginfo.txt");
     try {
         std::string home = "/home/onyazuka/";
-        //std::string path = home + "鈴木このみ アスタロア.mp3";
-        std::string path = "/media/onyazuka/New SSD/music/all-for-you-genshin-impact-hoyofair2023-new-year.mp3";
+        std::string path = home + "鈴木このみ アスタロア.mp3";
+        //std::string path = "/media/onyazuka/New SSD/music/all-for-you-genshin-impact-hoyofair2023-new-year.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");
@@ -54,10 +54,10 @@ int main()
                 tags[title] = std::get<1>(parser.Textual(title));
             }
             else if ((title[0] == 'W') && (title != "WXXX")) {
-                tags[title] = std::get<0>(parser.WUrl(title));
+                tags[title] = std::get<0>(parser.WUrl(title).front());
             }
         }
-        APICReader::ResultType apic = parser.APIC();
+        auto apic = parser.APIC();
         auto txxx = parser.TXXX();
         auto wxxx = parser.WXXX();
         auto comm = parser.COMM();
