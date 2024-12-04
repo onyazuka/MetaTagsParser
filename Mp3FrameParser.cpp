@@ -1,9 +1,8 @@
 #include "Mp3FrameParser.hpp"
 #include <string.h>
-#include "util.hpp"
+#include <iostream>
 
 using namespace mp3;
-using namespace util;
 
 const int mp3::Mp3FrameParser::BitrateIndexV1Map[4][16]   = {
     {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},                  // reserved
@@ -26,23 +25,15 @@ const int mp3::Mp3FrameParser::SamplingRateFreqIndexMap[4][4] = {
     {44100,48000,32000,-1}      // v1
 };
 
-mp3::Mp3FrameParser::Mp3FrameParser(std::ifstream& ifs, const Options& options)
-    : options{options}
+mp3::Mp3FrameParser::Mp3FrameParser(std::ifstream& ifs)
+    : ifs{ifs}
 {
     memset((void*)&headerRaw, 0, sizeof(headerRaw));
-    if (parse(ifs)) {
-        throw std::runtime_error("invalid mp3 header");
-    }
-    if (!options.assumeSameHeaders) {
-        throw std::runtime_error("not implemented");
-    }
+    parse(ifs);
 }
 
-double mp3::Mp3FrameParser::durationMs() const {
-    auto d1 = frameLenMs();
-    auto d2 = frameLenBytes();
-    auto d3 = headerLenBytes();
-    return frameLenMs() * (options.fileSize / frameLenBytes());
+void mp3::Mp3FrameParser::next() {
+    parse(ifs);
 }
 
 double mp3::Mp3FrameParser::frameLenBytes() const {
@@ -83,24 +74,26 @@ size_t mp3::Mp3FrameParser::headerLenBytes() const  {
     }
 }
 
-int mp3::Mp3FrameParser::parse(std::ifstream& ifs) {
+void mp3::Mp3FrameParser::parse(std::ifstream& ifs) {
     if (!ifs) {
-        return -1;
+        throw EOFException{};
     }
+
+    bool firstFrame = !headerRaw.sync1;
 
     ifs.read((char*)&headerRaw, sizeof(headerRaw));
     if (!(headerRaw.sync1 == 0xff && headerRaw.sync2 == 0x7)) {
-        return -1;
+        firstFrame ? throw NoFrameException{} : throw EOFException{};
     }
     if (headerRaw.bitrateIndex == 0b1111) {
         // bad bitrate index
-        return -1;
+        throw InvalidFrameHeaderException{};
     }
     if (headerRaw.bitrateIndex == 0b0000) {
-        throw std::runtime_error("not implemented");
+        throw NotImplementedException{};
     }
     if (headerRaw.samplingRateFreqIndex == 0b11) {
-        throw std::runtime_error("not implemented");
+        throw NotImplementedException{};
     }
     header.layer = (Layer)headerRaw.layerDescr;
     header.version = (MPEGAudioVersion)headerRaw.mpegAudioVersionID;
@@ -110,7 +103,46 @@ int mp3::Mp3FrameParser::parse(std::ifstream& ifs) {
         BitrateIndexV2Map[headerRaw.layerDescr][headerRaw.bitrateIndex])
         * 1000;
 
-    ifs.seekg((size_t)ifs.tellg() + frameLenBytes() - 4);
+    // searching for Xing header - we need to determine if that mp3 file has variadic bitrate
+    size_t pos = ifs.tellg();
+    if (firstFrame) {
+        ifs.seekg(pos + 32);
+        char data[4];
+        ifs.read((char*)&data, sizeof(data));
+        // Xing header is an indicator of variadic bitrate
+        if (data[0] == 'X' && data[1] == 'i' && data[2] == 'n' && data[3] == 'g') {
+            VBR = true;
+        }
+    }
+    ifs.seekg(pos + frameLenBytes() - 4);
+}
 
-    return 0;
+size_t mp3::getMp3FileDuration(std::ifstream& ifs) {
+    size_t pos = ifs.tellg();
+    ifs.seekg(0, std::ios_base::end);
+    size_t fileSize = (size_t)ifs.tellg() - pos;
+    ifs.seekg(pos, std::ios_base::beg);
+    double durationMs = 0.0;
+    try {
+        Mp3FrameParser mp3FrameParser(ifs);
+        //std::cout << "VBR=" << (mp3FrameParser.isVBR() ? "true" : "false") << std::endl;
+        //std::cout << "Bitrate: " << mp3FrameParser.getHeader().bitrate <<  ", Duration: " << mp3FrameParser.durationMs() << " ms\n";
+        // CBR
+        if (!mp3FrameParser.isVBR()) {
+            return mp3FrameParser.frameLenMs() * (fileSize / mp3FrameParser.frameLenBytes());
+        }
+        // VBR
+        else {
+            durationMs = mp3FrameParser.frameLenMs();
+            while (true) {
+                mp3FrameParser.next();
+                durationMs += mp3FrameParser.frameLenMs();
+                //std::cout << "Bitrate: " << mp3FrameParser.getHeader().bitrate <<  ", Duration: " << mp3FrameParser.durationMs() << " ms\n";
+            }
+        }
+    }
+    catch(Mp3FrameParser::EOFException) {
+        ;
+    }
+    return durationMs;
 }

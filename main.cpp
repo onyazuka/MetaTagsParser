@@ -41,13 +41,17 @@ int main()
 {
 
     testParser();
-    //TagScout scout("/media/onyazuka/New SSD/music");
-    //const auto& map = scout.map();
-    //scout.dump("/home/onyazuka/taginfo.txt");
+    //auto before = getTsMcs();
+    /*TagScout scout("/media/onyazuka/New SSD/music");
+    const auto& map = scout.map();
+    auto after = getTsMcs();
+    std::cout << "Elapsed: " << (after - before) << " mcs\n";
+    scout.dump("/home/onyazuka/taginfo.txt");
+    scout.dumpDurations("/home/onyazuka/durationinfo.txt");*/
     try {
         std::string home = "/home/onyazuka/";
-        //std::string path = home + "鈴木このみ アスタロア.mp3";
-        std::string path = "/media/onyazuka/New SSD/music/all-for-you-genshin-impact-hoyofair2023-new-year.mp3";
+        std::string path = home + "鈴木このみ アスタロア.mp3";
+        //std::string path = "/media/onyazuka/New SSD/music/all-for-you-genshin-impact-hoyofair2023-new-year.mp3";
         std::ifstream ifs(path, std::ios_base::binary);
         if (!ifs) {
             throw std::runtime_error("error opening file");
@@ -75,23 +79,10 @@ int main()
             std::cout << tag << "\n";
         }
 
-        size_t pos = ifs.tellg();
-        ifs.seekg(0, std::ios_base::end);
-        size_t fileSize = (size_t)ifs.tellg() - pos;
-        ifs.seekg(pos, std::ios_base::beg);
-
-        auto before = getTsMcs();
-        try {
-            while (true) {
-                Mp3FrameParser Mp3FrameParser(ifs, {true, fileSize});
-                //std::cout << "Bitrate: " << Mp3FrameParser.getHeader().bitrate <<  ", Duration: " << Mp3FrameParser.durationMs() << " ms\n";
-            }
-        }
-        catch(...) {
-            //std::cout << "End of file\n";
-        }
-        auto after = getTsMcs();
-        std::cout << "Elapsed: " << (after - before) << " mcs\n";
+        auto before1 = getTsMcs();
+        std::cout << "Duration " << mp3::getMp3FileDuration(ifs) << " ms\n";
+        auto after1 = getTsMcs();
+        std::cout << "Elapsed: " << (after1 - before1) << " mcs\n";
     }
     catch (std::runtime_error& err) {
         cout << "Error occured: " << err.what() << endl;

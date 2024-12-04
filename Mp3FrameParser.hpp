@@ -59,26 +59,30 @@ namespace mp3 {
     class Mp3FrameParser {
     public:
 
-        struct Options {
-            bool assumeSameHeaders;
-            size_t fileSize;
-        };
+        class NotImplementedException : public std::exception {};
+        class EOFException : public std::exception{};
+        class NoFrameException : public std::exception{};
+        class InvalidFrameHeaderException : public std::exception{};
 
-        Mp3FrameParser(std::ifstream& ifs, const Options& options);
-        double durationMs() const;
+        Mp3FrameParser(std::ifstream& ifs);
+        void next();
         inline const Mp3FrameHeader& getHeader() const { return header; }
-    private:
+        inline bool isVBR() const { return VBR; }
         double frameLenBytes() const;
         double frameLenMs() const;
         size_t headerLenBytes() const;
-        int parse(std::ifstream& ifs);
+    private:
+        void parse(std::ifstream& ifs);
         Mp3FrameHeaderRaw headerRaw;
         Mp3FrameHeader header;
-        const Options options;
+        std::ifstream& ifs;
+        bool VBR = false;
         static const int BitrateIndexV1Map[4][16];
         static const int BitrateIndexV2Map[4][16];
         static const int SamplingRateFreqIndexMap[4][4];
     };
+
+    size_t getMp3FileDuration(std::ifstream& ifs);
 
 }
 

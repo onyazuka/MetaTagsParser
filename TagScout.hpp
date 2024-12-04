@@ -13,8 +13,10 @@ public:
         return framePathMap;
     }
     void dump(const std::filesystem::path& path);
+    void dumpDurations(const std::filesystem::path& path);
 private:
     MapT framePathMap;
+    std::map<std::string, size_t> songDurationMap;
 };
 
 #endif // TAGSCOUT_H
