@@ -10,93 +10,10 @@
 #include <string.h>
 #include <list>
 #include "util.hpp"
+#include "Tag.hpp"
 
 namespace tag {
     namespace id3v2 {
-
-        enum class Encoding : uint8_t{
-            Ascii,
-            Utf16BOM,
-            Utf16BE,
-            Utf8
-        };
-
-        struct DataBlock {
-            DataBlock(uint8_t* data, size_t size);
-            uint8_t* data = 0;
-            size_t size = 0;
-            size_t offset = 0;
-            Encoding encoding = Encoding::Ascii;
-        };
-
-        struct AsciiStrNullTerminated {
-            using Data = std::string;
-            Data read(DataBlock& data);
-        };
-
-        template<size_t N>
-        struct AsciiStrSized {
-            using Data = std::string;
-            Data read(DataBlock& data) {
-                assert ((data.size - data.offset) >= N);
-                std::string res((char*)data.data + data.offset, N);
-                data.offset += N;
-                return res;
-            }
-        };
-
-        std::string decodeStr(uint8_t* data, size_t sz, Encoding encoding);
-
-        // Encoded string with null terminator of unknown length
-        class EncodedStrNullTerminated {
-        public:
-            using Data = std::string;
-            Data read(DataBlock& data);
-        };
-
-        // Encoded string of KNOWN length (data.size)
-        class EncodedStr {
-        public:
-            using Data = std::string;
-            Data read(DataBlock& data);
-        };
-
-        template<std::unsigned_integral N>
-        struct Bytes {
-            using Data = N;
-            Data read(DataBlock& data) {
-                assert (data.size - data.offset);
-                Data res;
-                res = util::swapBytes<N>(*(N*)(data.data + data.offset));
-                data.offset += sizeof(N);
-                return res;
-            }
-        };
-
-        // consumes all remaining data as binary data
-        struct BinaryData {
-            using Data = std::pair<std::shared_ptr<uint8_t[]>, size_t>;
-            Data read(DataBlock& data);
-        };
-
-        using Byte = Bytes<uint8_t>;
-        using Byte2 = Bytes<uint16_t>;
-        using Byte4 = Bytes<uint32_t>;
-        using Byte8 = Bytes<uint64_t>;
-
-        struct EncodingByte {
-            using Data = Encoding;
-            Data read(DataBlock& data);
-        };
-
-
-        template<typename... Args>
-        struct FrameReader {
-            using ResultType = std::tuple<typename Args::Data...>;
-            std::tuple<typename Args::Data...> read(DataBlock data) {
-                return ResultType{Args().read(data)...};
-            }
-        };
 
         using APICReader = FrameReader<EncodingByte, AsciiStrNullTerminated, Byte, EncodedStrNullTerminated, BinaryData>;
         using TextualFrameReader = FrameReader<EncodingByte, EncodedStrNullTerminated>;
@@ -115,12 +32,6 @@ namespace tag {
                 Data data;
             };
             using Frames = std::unordered_map<std::string, std::list<Frame>>;
-
-            class NoTagException : public std::exception {};
-            class UnknownTagVersionException : public std::exception {};
-            class InvalidTagException : public std::exception {};
-            class UnknownTagException : public std::exception {};
-            class NotImplementedException : public std::exception {};
 
             ID3V2Extractor(std::ifstream& fs);
             inline Frames& frames() { return _frames; }
@@ -144,25 +55,9 @@ namespace tag {
         };
 
 
-        class ID3V2Parser {
+        class ID3V2Parser : public Tag {
         public:
             ID3V2Parser(ID3V2Extractor&& extractor);
-
-            std::string asString(const std::string& title);
-            std::string asNString(const std::string& title);
-            static std::string asNString(uint8_t* data, size_t n);
-            std::basic_string<char16_t> asUtf16LEString(const std::string& title);
-            static std::basic_string<char16_t> asUtf16LEString(uint8_t* data, size_t n);
-            std::wstring asUtf16LEWstring(const std::string& title);
-            static std::wstring asUtf16LEWstring(uint8_t* data, size_t n);
-            std::string asUtf8String(const std::string& title);
-            static std::string asUtf8String(uint8_t* data, size_t n);
-            static std::string asUtf8String(uint8_t* data, size_t n, uint8_t encoding);
-            static std::string asUtf8String_ascii(uint8_t* data, size_t n);
-            static std::string asUtf8String_utf16BOM(uint8_t* data, size_t n);
-            static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
-            static std::string asUtf8String_utf8(uint8_t* data, size_t n);
-
             inline std::list<APICReader::ResultType> APIC() { return readFrames<APICReader>("APIC"); }
             inline TextualFrameReader::ResultType Textual(const std::string& frameName) { return readFrame<TextualFrameReader>(frameName); }
             inline std::list<TXXXReader::ResultType> TXXX() { return readFrames<TXXXReader>("TXXX"); }
@@ -176,8 +71,8 @@ namespace tag {
             std::list<typename ReaderType::ResultType> readFrames(const std::string& frameName);
 
         protected:
-            std::pair<uint8_t*, size_t> getFrameData(const std::string& title);
-            std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string& title);
+            std::pair<uint8_t*, size_t> getFrameData(const std::string& title) override;
+            std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string& title) override;
             ID3V2Extractor extractor;
         };
 

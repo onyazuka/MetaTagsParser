@@ -5,9 +5,11 @@ using namespace std;
 #include "ID3V2Parser.hpp"
 #include "Mp3FrameParser.hpp"
 #include "TagScout.hpp"
+#include "FlacTagParser.hpp"
 
 using namespace util;
 using namespace tag::id3v2;
+using namespace tag::flac;
 using namespace mp3;
 
 void testUtfConverters() {
@@ -29,6 +31,21 @@ void testUtfConverters() {
     assert(s4 == s4_1);
 }
 
+void testFlacExtractor() {
+    std::string path = "/media/onyazuka/New SSD/music/虹のコンキスタドール/01 心臓にメロディー.flac";
+    std::ifstream ifs(path, std::ios_base::binary);
+    if (!ifs) {
+        throw std::runtime_error("error opening file");
+    }
+    FlacTagExtractor extractor(ifs);
+    FlacTagParser parser(std::move(extractor));
+    auto vorbis = parser.VorbisComment();
+    for (const auto& str : std::get<3>(vorbis)) {
+        cout << str << endl;
+    }
+    cout << "ok" << endl;
+}
+
 void testParser() {
     testUtfConverters();
 }
@@ -41,6 +58,7 @@ int main()
 {
 
     testParser();
+    testFlacExtractor();
     //auto before = getTsMcs();
     /*TagScout scout("/media/onyazuka/New SSD/music");
     const auto& map = scout.map();

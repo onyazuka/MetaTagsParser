@@ -6,6 +6,7 @@
 namespace fs = std::filesystem;
 using namespace tag::id3v2;
 using namespace mp3;
+using namespace tag;
 
 TagScout::TagScout(const std::filesystem::path& path) {
     for (const fs::directory_entry& entry : fs::recursive_directory_iterator(path)) {
@@ -38,23 +39,23 @@ TagScout::TagScout(const std::filesystem::path& path) {
                 framePathMap["CBR"].push_back(entry.path().string());
             }*/
         }
-        catch (ID3V2Extractor::NoTagException) {
+        catch (NoTagException&) {
             // not a error, just no tag
             continue;
         }
-        catch (ID3V2Extractor::UnknownTagException) {
+        catch (UnknownTagException&) {
             // not a error, just unknown tag
             framePathMap["unknown"].push_back(entry.path().string());
             continue;
         }
-        catch (ID3V2Extractor::InvalidTagException) {
+        catch (InvalidTagException&) {
             // tag is invalid, but some data may be ok
             continue;
         }
-        catch (Mp3FrameParser::EOFException) {
+        catch (Mp3FrameParser::EOFException&) {
             continue;
         }
-        catch (Mp3FrameParser::NoFrameException) {
+        catch (Mp3FrameParser::NoFrameException&) {
             continue;
         }
         catch (...) {
