@@ -79,10 +79,14 @@ tag::flac::FlacTagExtractor::Frame tag::flac::FlacTagExtractor::extractFrame(std
 FlacTagParser::FlacTagParser(std::ifstream& fs)
 {
     extractor = std::shared_ptr<Extractor>(new FlacTagExtractor(fs));
+    vorbis = VorbisCommentMap();
 }
 
 VorbisCommentReader::ResultType tag::flac::FlacTagParser::VorbisComment() {
     auto [frameData, frameSize] = extractor->frameData("VORBIS_COMMENT");
+    if (!frameData || !frameSize) {
+        return {};
+    }
     DataBlock data(frameData.get(), frameSize);
     data.encoding = Encoding::Utf8;
     return VorbisCommentReader().read(data);
@@ -90,6 +94,9 @@ VorbisCommentReader::ResultType tag::flac::FlacTagParser::VorbisComment() {
 
 std::unordered_map<std::string, std::string> tag::flac::FlacTagParser::VorbisCommentMap() {
     auto vorbisComment = VorbisComment();
+    if (std::get<2>(vorbisComment) == 0) {
+        return {};
+    }
     std::unordered_map<std::string, std::string> res;
     for (const auto& comment : std::get<3>(vorbisComment)) {
         auto pos = comment.find('=');
@@ -107,6 +114,9 @@ std::unordered_map<std::string, std::string> tag::flac::FlacTagParser::VorbisCom
 
 PictureReader::ResultType tag::flac::FlacTagParser::Picture() {
     auto [frameData, frameSize] = extractor->frameData("PICTURE");
+    if (!frameData || !frameSize) {
+        return {};
+    }
     DataBlock data(frameData.get(), frameSize);
     data.encoding = Encoding::Utf8;
     return PictureReader().read(data);
@@ -114,6 +124,9 @@ PictureReader::ResultType tag::flac::FlacTagParser::Picture() {
 
 tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo() {
     auto [frameData, frameSize] = extractor->frameData("STREAMINFO");
+    if (!frameData || !frameSize) {
+        return {};
+    }
     StreamInfoDescrRaw streamInfoRaw = *(StreamInfoDescrRaw*)(frameData.get());
     StreamInfoDescr streamInfo;
     streamInfo.minimumBlockSizeInSamples = swapBytes(streamInfoRaw.minimumBlockSizeInSamples);
@@ -125,4 +138,39 @@ tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo()
     streamInfo.bitsPerSample = (streamInfoRaw.bitsPerSample1 << 4) | streamInfoRaw.bitsPerSample2;
     streamInfo.totalSamples = (streamInfoRaw.totalSamples1 << 4) | swapBytes(streamInfoRaw.totalSamples2);
     return streamInfo;
+}
+
+std::string tag::flac::FlacTagParser::songTitle() {
+    if (auto iter = vorbis.find("TITLE"); iter != vorbis.end()) {
+        return iter->second;
+    }
+    else {
+        return "";
+    }
+}
+
+std::string tag::flac::FlacTagParser::album() {
+    if (auto iter = vorbis.find("ALBUM"); iter != vorbis.end()) {
+        return iter->second;
+    }
+    else {
+        return "";
+    }
+}
+
+std::string tag::flac::FlacTagParser::artist() {
+    if (auto iter = vorbis.find("ARTIST"); iter != vorbis.end()) {
+        return iter->second;
+    }
+    else {
+        return "";
+    }
+}
+
+size_t tag::flac::FlacTagParser::durationMs() {
+    auto streamInfo = StreamInfo();
+    if (!streamInfo.sampleRate) {
+        return 0;
+    }
+    return streamInfo.totalSamples / streamInfo.sampleRate;
 }

@@ -66,10 +66,16 @@ namespace tag {
             inline std::list<WXXXReader::ResultType> WXXX() { return readFrames<WXXXReader>("WXXX"); }
             inline std::list<COMMReader::ResultType> COMM() { return readFrames<COMMReader>("COMM"); }
 
+            std::string songTitle() override;
+            std::string album() override;
+            std::string artist() override;
+            size_t durationMs() override;
+
             template<typename ReaderType>
             typename ReaderType::ResultType readFrame(const std::string& frameName);
             template<typename ReaderType>
             std::list<typename ReaderType::ResultType> readFrames(const std::string& frameName);
+            int64_t _durationMs = -1;
         };
 
         template<typename ReaderType>

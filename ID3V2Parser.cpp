@@ -1,4 +1,5 @@
 #include "ID3V2Parser.hpp"
+#include "Mp3FrameParser.hpp"
 
 using namespace util;
 using namespace tag::id3v2;
@@ -171,5 +172,21 @@ int tag::id3v2::ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
 tag::id3v2::ID3V2Parser::ID3V2Parser(std::ifstream& fs)
 {
     extractor = std::shared_ptr<Extractor>(new ID3V2Extractor(fs));
+    _durationMs = mp3::getMp3FileDuration(fs);
 }
 
+std::string tag::id3v2::ID3V2Parser::songTitle() {
+    return std::get<1>(Textual("TIT2"));
+}
+
+std::string tag::id3v2::ID3V2Parser::album() {
+    return std::get<1>(Textual("TALB"));
+}
+
+std::string tag::id3v2::ID3V2Parser::artist() {
+    return std::get<1>(Textual("TPE1"));
+}
+
+size_t tag::id3v2::ID3V2Parser::durationMs() {
+    return _durationMs;
+}

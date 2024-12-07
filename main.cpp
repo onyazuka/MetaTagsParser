@@ -32,7 +32,8 @@ void testUtfConverters() {
 }
 
 void testFlacExtractor() {
-    std::string path = "/media/onyazuka/New SSD/music/虹のコンキスタドール/01 心臓にメロディー.flac";
+    //std::string path = "/media/onyazuka/New SSD/music/虹のコンキスタドール/01 心臓にメロディー.flac";
+    std::string path = "/media/onyazuka/New SSD/music/Oasis - Falling Down (Eden of the East OP theme).flac";
     std::ifstream ifs(path, std::ios_base::binary);
     if (!ifs) {
         throw std::runtime_error("error opening file");
@@ -60,12 +61,12 @@ int main()
 
     testParser();
     testFlacExtractor();
-    auto before = getTsMcs();
+    /*auto before = getTsMcs();
     TagScout scout("/media/onyazuka/New SSD/music");
     const auto& map = scout.map();
     const auto& durationsMap = scout.durations();
     auto after = getTsMcs();
-    std::cout << "Elapsed: " << (after - before) << " mcs\n";
+    std::cout << "Elapsed: " << (after - before) << " mcs\n";*/
     /*scout.dump("/home/onyazuka/taginfo.txt");
     scout.dumpDurations("/home/onyazuka/durationinfo.txt");*/
     try {

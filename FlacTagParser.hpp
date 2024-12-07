@@ -87,6 +87,13 @@ namespace tag {
             std::unordered_map<std::string, std::string> VorbisCommentMap();
             PictureReader::ResultType Picture();
             StreamInfoDescr StreamInfo();
+
+            std::string songTitle() override;
+            std::string album() override;
+            std::string artist() override;
+            size_t durationMs() override;
+        private:
+            std::unordered_map<std::string, std::string> vorbis;
         };
 
     }

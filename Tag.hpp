@@ -128,7 +128,8 @@ namespace tag {
             return Data{};
         }
         Data res;
-        for (size_t i = 0; i < data.sizeOfData; ++i) {
+        size_t sizeOfList = data.sizeOfData;
+        for (size_t i = 0; i < sizeOfList; ++i) {
             SizeOfData<E> size;
             size.read(data);
             EncodedStr str;
@@ -179,6 +180,11 @@ namespace tag {
         static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
         static std::string asUtf8String_utf8(uint8_t* data, size_t n);
         inline auto getExtractor() { return extractor; }
+
+        virtual std::string songTitle() = 0;
+        virtual std::string album() = 0;
+        virtual std::string artist() = 0;
+        virtual size_t durationMs()  = 0;
     protected:
         std::shared_ptr<Extractor> extractor;
     };
