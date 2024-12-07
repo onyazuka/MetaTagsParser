@@ -12,6 +12,9 @@ public:
     inline const MapT map() const {
         return framePathMap;
     }
+    inline const std::map<std::string, size_t>& durations() const {
+        return songDurationMap;
+    }
     void dump(const std::filesystem::path& path);
     void dumpDurations(const std::filesystem::path& path);
 private:

@@ -60,12 +60,13 @@ int main()
 
     testParser();
     testFlacExtractor();
-    //auto before = getTsMcs();
-    /*TagScout scout("/media/onyazuka/New SSD/music");
+    auto before = getTsMcs();
+    TagScout scout("/media/onyazuka/New SSD/music");
     const auto& map = scout.map();
+    const auto& durationsMap = scout.durations();
     auto after = getTsMcs();
     std::cout << "Elapsed: " << (after - before) << " mcs\n";
-    scout.dump("/home/onyazuka/taginfo.txt");
+    /*scout.dump("/home/onyazuka/taginfo.txt");
     scout.dumpDurations("/home/onyazuka/durationinfo.txt");*/
     try {
         std::string home = "/home/onyazuka/";

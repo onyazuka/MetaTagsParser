@@ -2,9 +2,11 @@
 #include <fstream>
 #include "ID3V2Parser.hpp"
 #include "Mp3FrameParser.hpp"
+#include "FlacTagParser.hpp"
 
 namespace fs = std::filesystem;
 using namespace tag::id3v2;
+using namespace tag::flac;
 using namespace mp3;
 using namespace tag;
 
@@ -22,15 +24,27 @@ TagScout::TagScout(const std::filesystem::path& path) {
             if (!ifs) {
                 continue;
             }
-            ID3V2Extractor extractor(ifs);
-            const auto& frames = extractor.frames();
-            for (const auto& frame: frames) {
-                framePathMap[frame.first].push_back(entry.path().string());
+            std::unique_ptr<Tag> parser;
+            if (extension == ".mp3"){
+                parser.reset(new ID3V2Parser(ifs));
             }
-            if (extractor.version() == 4) {
-                framePathMap["v4"].push_back(entry.path().string());
+            else {
+                parser.reset(new FlacTagParser(ifs));
             }
-            songDurationMap[entry.path()] = getMp3FileDuration(ifs);
+            for (const auto& frame: parser->getExtractor()->frameTitles()) {
+                framePathMap[frame].push_back(entry.path().string());
+            }
+            if (extension == ".mp3") {
+                /*if (extractor.version() == 4) {
+                    framePathMap["v4"].push_back(entry.path().string());
+                }*/
+                songDurationMap[entry.path()] = getMp3FileDuration(ifs);
+            }
+            else {
+                auto p = dynamic_cast<FlacTagParser*>(parser.get());
+                songDurationMap[entry.path()] = p->StreamInfo().totalSamples / p->StreamInfo().sampleRate;
+            }
+
             /*mp3::Mp3FrameParser mp3FrameParser(ifs);
             if (mp3FrameParser.isVBR()) {
                 framePathMap["VBR"].push_back(entry.path().string());
