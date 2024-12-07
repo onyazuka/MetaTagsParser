@@ -39,10 +39,12 @@ void testFlacExtractor() {
     }
     FlacTagExtractor extractor(ifs);
     FlacTagParser parser(std::move(extractor));
-    auto vorbis = parser.VorbisComment();
-    for (const auto& str : std::get<3>(vorbis)) {
-        cout << str << endl;
+    auto vorbis = parser.VorbisCommentMap();
+    for (const auto& [key,val] : vorbis) {
+        cout << key << " = " << val << endl;
     }
+    auto picture = parser.Picture();
+    auto streamInfo = parser.StreamInfo();
     cout << "ok" << endl;
 }
 

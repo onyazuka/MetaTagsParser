@@ -91,9 +91,11 @@ BinaryData::Data tag::BinaryData::read(DataBlock& data) {
     if ((data.size - data.offset) == 0) {
         return Data{};
     }
-    Data res{new uint8_t[data.size - data.offset], 0};
-    memcpy(res.first.get(), data.data + data.offset, data.size - data.offset);
-    res.second = data.size - data.offset;
+    size_t size = data.sizeOfData ? data.sizeOfData : data.size - data.offset;
+    Data res{new uint8_t[size], 0};
+    memcpy(res.first.get(), data.data + data.offset, size);
+    res.second = size;
+    data.sizeOfData = 0;
     return res;
 }
 

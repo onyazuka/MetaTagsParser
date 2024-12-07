@@ -1,6 +1,7 @@
 #include "FlacTagParser.hpp"
 
 using namespace tag::flac;
+using namespace util;
 
 const std::array<std::string, (size_t)tag::flac::FlacTagExtractor::BlockType::Count> tag::flac::FlacTagExtractor::BlockTypeStrMap = {
     "STREAMINFO",
@@ -66,4 +67,43 @@ VorbisCommentReader::ResultType tag::flac::FlacTagParser::VorbisComment() {
     DataBlock data(frame.data.get(), frame.header.size);
     data.encoding = Encoding::Utf8;
     return VorbisCommentReader().read(data);
+}
+
+std::unordered_map<std::string, std::string> tag::flac::FlacTagParser::VorbisCommentMap() {
+    auto vorbisComment = VorbisComment();
+    std::unordered_map<std::string, std::string> res;
+    for (const auto& comment : std::get<3>(vorbisComment)) {
+        auto pos = comment.find('=');
+        if (pos == comment.npos) {
+            continue;
+        }
+        std::string val;
+        if (pos != (comment.size() - 1)) {
+            val = comment.substr(pos + 1);
+        }
+        res[comment.substr(0, pos)] = std::move(val);
+    }
+    return res;
+}
+
+PictureReader::ResultType tag::flac::FlacTagParser::Picture() {
+    const auto& frame = extractor.frames()["PICTURE"].front();
+    DataBlock data(frame.data.get(), frame.header.size);
+    data.encoding = Encoding::Utf8;
+    return PictureReader().read(data);
+}
+
+tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo() {
+    const auto& frame = extractor.frames()["STREAMINFO"].front();
+    StreamInfoDescrRaw streamInfoRaw = *(StreamInfoDescrRaw*)(frame.data.get());
+    StreamInfoDescr streamInfo;
+    streamInfo.minimumBlockSizeInSamples = swapBytes(streamInfoRaw.minimumBlockSizeInSamples);
+    streamInfo.maximumBlockSizeInSamples = swapBytes(streamInfoRaw.maximumBlockSizeInSamples);
+    streamInfo.minimumFrameSizeInBytes = swapBytes<uint32_t, 3>(streamInfoRaw.minimumFrameSizeInBytes);
+    streamInfo.maximumFrameSizeInBytes = swapBytes<uint32_t, 3>(streamInfoRaw.maximumFrameSizeInBytes);
+    streamInfo.sampleRate = ((uint32_t)swapBytes(streamInfoRaw.sampleRate1) << 4) | ((uint32_t)streamInfoRaw.sampleRate2);
+    streamInfo.channels = streamInfoRaw.channels;
+    streamInfo.bitsPerSample = (streamInfoRaw.bitsPerSample1 << 4) | streamInfoRaw.bitsPerSample2;
+    streamInfo.totalSamples = (streamInfoRaw.totalSamples1 << 4) | swapBytes(streamInfoRaw.totalSamples2);
+    return streamInfo;
 }
