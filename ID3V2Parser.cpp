@@ -46,6 +46,26 @@ tag::id3v2::ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     }
 }
 
+std::list<std::pair<tag::Extractor::Data, size_t>> tag::id3v2::ID3V2Extractor::framesData(const std::string& frameName) {
+    auto iter = _frames.find(frameName);
+    if (iter == _frames.end()) {
+        return {};
+    }
+    std::list<std::pair<tag::Extractor::Data, size_t>> res;
+    for (const auto& item : iter->second) {
+        res.push_back({item.data, item.size});
+    }
+    return res;
+}
+
+std::vector<std::string> tag::id3v2::ID3V2Extractor::frameTitles() const {
+    std::vector<std::string> res;
+    for (const auto& [title, frame] : _frames) {
+        res.push_back(title);
+    }
+    return res;
+}
+
 bool tag::id3v2::ID3V2Extractor::checkFile(std::ifstream& fs) {
     char data[5];
     fs.read((char*)&data, sizeof(data));
@@ -148,33 +168,8 @@ int tag::id3v2::ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
     return frame.size;
 }
 
-tag::id3v2::ID3V2Parser::ID3V2Parser(ID3V2Extractor&& _extractor)
-    : extractor{std::move(_extractor)}
+tag::id3v2::ID3V2Parser::ID3V2Parser(std::ifstream& fs)
 {
-    ;
+    extractor = std::shared_ptr<Extractor>(new ID3V2Extractor(fs));
 }
 
-std::pair<uint8_t*, size_t> tag::id3v2::ID3V2Parser::getFrameData(const std::string& title) {
-    const auto& frames = extractor.frames();
-    auto iter = frames.find(title);
-    if (iter == frames.end()) {
-        return {nullptr, 0};
-    }
-    auto frame = iter->second;
-    return {frame.front().data.get(), frame.front().size};
-}
-
-std::list<std::pair<uint8_t*, size_t>> tag::id3v2::ID3V2Parser::getFramesData(const std::string& title) {
-    const auto& frames = extractor.frames();
-    auto iter = frames.find(title);
-    if (iter == frames.end()) {
-        return {};
-    }
-    auto frame = iter->second;
-    std::list<std::pair<uint8_t*, size_t>> res;
-    while (!frame.empty()) {
-        res.push_back({frame.front().data.get(), frame.front().size});
-        frame.pop_front();
-    }
-    return res;
-}

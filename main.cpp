@@ -37,8 +37,7 @@ void testFlacExtractor() {
     if (!ifs) {
         throw std::runtime_error("error opening file");
     }
-    FlacTagExtractor extractor(ifs);
-    FlacTagParser parser(std::move(extractor));
+    FlacTagParser parser(ifs);
     auto vorbis = parser.VorbisCommentMap();
     for (const auto& [key,val] : vorbis) {
         cout << key << " = " << val << endl;
@@ -76,13 +75,10 @@ int main()
         if (!ifs) {
             throw std::runtime_error("error opening file");
         }
-        ID3V2Extractor extractor(ifs);
-        cout << "ok" << endl;
 
         std::unordered_map<std::string, std::string> tags;
-        auto frames = extractor.frames();
-        ID3V2Parser parser(std::move(extractor));
-        for (auto& [title, frame] : frames) {
+        ID3V2Parser parser(ifs);
+        for (const auto& title : parser.getExtractor()->frameTitles()) {
             if(title[0] == 'T' && (title != "TXXX")) {
                 tags[title] = std::get<1>(parser.Textual(title));
             }

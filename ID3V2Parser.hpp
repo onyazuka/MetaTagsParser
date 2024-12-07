@@ -23,9 +23,8 @@ namespace tag {
         using COMMReader = FrameReader<EncodingByte, AsciiStrSized<3>, EncodedStrNullTerminated, EncodedStrNullTerminated>;
 
 
-        class ID3V2Extractor {
+        class ID3V2Extractor : public Extractor {
         public:
-            using Data = std::shared_ptr<uint8_t[]>;
             struct Frame {
                 uint32_t size = 0;
                 uint16_t flags = 0;
@@ -41,6 +40,8 @@ namespace tag {
             inline bool experimental() const { return _flags & ((uint8_t)1<<5); }
             inline bool hasFooter() const { return (_version == 4) && (_flags & ((uint8_t)1 << 4) ); }
             inline uint8_t version() const { return _version; }
+            std::list<std::pair<Extractor::Data, size_t>> framesData(const std::string& frameName) override;
+            std::vector<std::string> frameTitles() const override;
         private:
             bool checkFile(std::ifstream& fs);
             int extractHeader(std::ifstream& fs);
@@ -57,7 +58,7 @@ namespace tag {
 
         class ID3V2Parser : public Tag {
         public:
-            ID3V2Parser(ID3V2Extractor&& extractor);
+            ID3V2Parser(std::ifstream& fs);
             inline std::list<APICReader::ResultType> APIC() { return readFrames<APICReader>("APIC"); }
             inline TextualFrameReader::ResultType Textual(const std::string& frameName) { return readFrame<TextualFrameReader>(frameName); }
             inline std::list<TXXXReader::ResultType> TXXX() { return readFrames<TXXXReader>("TXXX"); }
@@ -69,28 +70,25 @@ namespace tag {
             typename ReaderType::ResultType readFrame(const std::string& frameName);
             template<typename ReaderType>
             std::list<typename ReaderType::ResultType> readFrames(const std::string& frameName);
-
-        protected:
-            std::pair<uint8_t*, size_t> getFrameData(const std::string& title) override;
-            std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string& title) override;
-            ID3V2Extractor extractor;
         };
 
         template<typename ReaderType>
         typename ReaderType::ResultType ID3V2Parser::readFrame(const std::string& frameName) {
-            auto [data, size] = getFrameData(frameName);
+            auto frames = extractor->framesData(frameName);
+            if (frames.empty()) return {};
+            auto [data, size] = frames.front();
             if (!data || !size) {
                 return {};
             }
-            return ReaderType().read(DataBlock(data, size));
+            return ReaderType().read(DataBlock(data.get(), size));
         }
 
         template<typename ReaderType>
         std::list<typename ReaderType::ResultType> ID3V2Parser::readFrames(const std::string& frameName) {
-            auto frames = getFramesData(frameName);
+            auto frames = extractor->framesData(frameName);
             std::list<typename ReaderType::ResultType> res;
             for (auto& [data, size] : frames) {
-                res.push_back(ReaderType().read(DataBlock(data, size)));
+                res.push_back(ReaderType().read(DataBlock(data.get(), size)));
             }
             return res;
         }

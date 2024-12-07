@@ -3,6 +3,14 @@
 using namespace util;
 using namespace tag;
 
+std::pair<Extractor::Data, size_t> Extractor::frameData(const std::string& frameName) {
+    auto res = framesData(frameName);
+    if (res.empty()) {
+        return {nullptr, 0};
+    }
+    return {res.front().first, res.front().second};
+}
+
 tag::DataBlock::DataBlock(uint8_t* data, size_t size)
     : data{data}, size{size}, offset{0}, encoding{Encoding::Ascii}
 {
@@ -114,11 +122,11 @@ std::string tag::Tag::asString(const std::string& title) {
 }
 
 std::string tag::Tag::asNString(const std::string& title) {
-    auto [data, size] = getFrameData(title);
+    auto [data, size] = extractor->frameData(title);
     if (!data || !size) {
         return "";
     }
-    return asNString(data, size);
+    return asNString(data.get(), size);
 }
 
 std::string tag::Tag::asNString(uint8_t* data, size_t n) {
@@ -129,11 +137,11 @@ std::string tag::Tag::asNString(uint8_t* data, size_t n) {
 }
 
 std::basic_string<char16_t> tag::Tag::asUtf16LEString(const std::string& title) {
-    auto [data, size] = getFrameData(title);
+    auto [data, size] = extractor->frameData(title);
     if (!data || !size) {
         return {};
     }
-    return asUtf16LEString(data, size - 3);
+    return asUtf16LEString(data.get(), size - 3);
 }
 
 std::basic_string<char16_t> tag::Tag::asUtf16LEString(uint8_t* data, size_t size) {
@@ -168,11 +176,11 @@ std::wstring tag::Tag::asUtf16LEWstring(uint8_t* data, size_t n) {
 }
 
 std::string tag::Tag::asUtf8String(const std::string& title) {
-    auto [data, size] = getFrameData(title);
+    auto [data, size] = extractor->frameData(title);
     if (!data || !size) {
         return "";
     }
-    return asUtf8String(data, size);
+    return asUtf8String(data.get(), size);
 }
 
 std::string tag::Tag::asUtf8String(uint8_t* data, size_t size) {

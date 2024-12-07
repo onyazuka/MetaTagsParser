@@ -9,6 +9,8 @@
 #include <concepts>
 #include <string.h>
 #include <list>
+#include <vector>
+#include <filesystem>
 #include "util.hpp"
 
 namespace tag {
@@ -151,6 +153,14 @@ namespace tag {
     class UnknownTagException : public std::exception {};
     class NotImplementedException : public std::exception {};
 
+    class Extractor {
+    public:
+        using Data = std::shared_ptr<uint8_t[]>;
+        std::pair<Extractor::Data, size_t> frameData(const std::string& frameName);
+        virtual std::list<std::pair<Extractor::Data, size_t>> framesData(const std::string& frameName) = 0;
+        virtual std::vector<std::string> frameTitles() const = 0;
+    };
+
     class Tag {
     public:
         virtual ~Tag() {}
@@ -168,9 +178,9 @@ namespace tag {
         static std::string asUtf8String_utf16BOM(uint8_t* data, size_t n);
         static std::string asUtf8String_utf16BE(uint8_t* data, size_t n);
         static std::string asUtf8String_utf8(uint8_t* data, size_t n);
+        inline auto getExtractor() { return extractor; }
     protected:
-        virtual std::pair<uint8_t*, size_t> getFrameData(const std::string& title) = 0;
-        virtual std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string& title) = 0;
+        std::shared_ptr<Extractor> extractor;
     };
 
 }

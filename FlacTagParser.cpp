@@ -22,6 +22,26 @@ tag::flac::FlacTagExtractor::FlacTagExtractor(std::ifstream& fs) {
     }
 }
 
+std::list<std::pair<tag::Extractor::Data, size_t>> tag::flac::FlacTagExtractor::framesData(const std::string& frameName) {
+    auto iter = _frames.find(frameName);
+    if (iter == _frames.end()) {
+        return {};
+    }
+    std::list<std::pair<tag::Extractor::Data, size_t>> res;
+    for (const auto& item : iter->second) {
+        res.push_back({item.data, item.header.size});
+    }
+    return res;
+}
+
+std::vector<std::string> tag::flac::FlacTagExtractor::frameTitles() const {
+    std::vector<std::string> res;
+    for (const auto& [title, frame] : _frames) {
+        res.push_back(title);
+    }
+    return res;
+}
+
 bool tag::flac::FlacTagExtractor::checkFile(std::ifstream& fs) {
     char data[4];
     fs.read((char*)&data, sizeof(data));
@@ -56,15 +76,14 @@ tag::flac::FlacTagExtractor::Frame tag::flac::FlacTagExtractor::extractFrame(std
     return frame;
 }
 
-FlacTagParser::FlacTagParser(FlacTagExtractor&& extractor)
-    : extractor{std::move(extractor)}
+FlacTagParser::FlacTagParser(std::ifstream& fs)
 {
-    ;
+    extractor = std::shared_ptr<Extractor>(new FlacTagExtractor(fs));
 }
 
 VorbisCommentReader::ResultType tag::flac::FlacTagParser::VorbisComment() {
-    const auto& frame = extractor.frames()["VORBIS_COMMENT"].front();
-    DataBlock data(frame.data.get(), frame.header.size);
+    auto [frameData, frameSize] = extractor->frameData("VORBIS_COMMENT");
+    DataBlock data(frameData.get(), frameSize);
     data.encoding = Encoding::Utf8;
     return VorbisCommentReader().read(data);
 }
@@ -87,15 +106,15 @@ std::unordered_map<std::string, std::string> tag::flac::FlacTagParser::VorbisCom
 }
 
 PictureReader::ResultType tag::flac::FlacTagParser::Picture() {
-    const auto& frame = extractor.frames()["PICTURE"].front();
-    DataBlock data(frame.data.get(), frame.header.size);
+    auto [frameData, frameSize] = extractor->frameData("PICTURE");
+    DataBlock data(frameData.get(), frameSize);
     data.encoding = Encoding::Utf8;
     return PictureReader().read(data);
 }
 
 tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo() {
-    const auto& frame = extractor.frames()["STREAMINFO"].front();
-    StreamInfoDescrRaw streamInfoRaw = *(StreamInfoDescrRaw*)(frame.data.get());
+    auto [frameData, frameSize] = extractor->frameData("STREAMINFO");
+    StreamInfoDescrRaw streamInfoRaw = *(StreamInfoDescrRaw*)(frameData.get());
     StreamInfoDescr streamInfo;
     streamInfo.minimumBlockSizeInSamples = swapBytes(streamInfoRaw.minimumBlockSizeInSamples);
     streamInfo.maximumBlockSizeInSamples = swapBytes(streamInfoRaw.maximumBlockSizeInSamples);

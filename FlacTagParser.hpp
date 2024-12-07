@@ -18,9 +18,8 @@ namespace tag {
         using VorbisCommentReader = FrameReader<SizeOfData<LittleEndian>, EncodedStr, SizeOfData<LittleEndian>, ListOfEncodedStrings<LittleEndian>>;
         using PictureReader = FrameReader<Bytes<uint32_t, BigEndian>, SizeOfData<BigEndian>, EncodedStr, SizeOfData<BigEndian>, EncodedStr, Bytes<uint32_t, BigEndian>, Bytes<uint32_t, BigEndian>, Bytes<uint32_t, BigEndian>, Bytes<uint32_t, BigEndian>, SizeOfData<BigEndian>, BinaryData>;
 
-        class FlacTagExtractor {
+        class FlacTagExtractor : public Extractor {
         public:
-            using Data = std::shared_ptr<uint8_t[]>;
             enum class BlockType {
                 STREAMINFO,
                 PADDING,
@@ -45,6 +44,8 @@ namespace tag {
             using Frames = std::unordered_map<std::string, std::list<Frame>>;
             FlacTagExtractor(std::ifstream& ifs);
             inline Frames& frames() { return _frames; }
+            std::list<std::pair<Extractor::Data, size_t>> framesData(const std::string& frameName) override;
+            std::vector<std::string> frameTitles() const override;
         private:
             bool checkFile(std::ifstream& fs);
             int extractFrames(std::ifstream& fs);
@@ -81,16 +82,11 @@ namespace tag {
                 uint64_t totalSamples;
             };
 
-            FlacTagParser(FlacTagExtractor&& extractor);
+            FlacTagParser(std::ifstream& fs);
             VorbisCommentReader::ResultType VorbisComment();
             std::unordered_map<std::string, std::string> VorbisCommentMap();
             PictureReader::ResultType Picture();
             StreamInfoDescr StreamInfo();
-
-            inline std::pair<uint8_t*, size_t> getFrameData(const std::string&) override {return {};};
-            inline std::list<std::pair<uint8_t*, size_t>> getFramesData(const std::string&) override {return {};};
-        private:
-            FlacTagExtractor extractor;
         };
 
     }
