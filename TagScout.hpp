@@ -27,7 +27,7 @@ private:
 };
 
 /*
-    Class for extracting metainfo from a file.
+    Function for extracting metainfo from a file.
     Populates a metainfo map.
     Keys:
         title
@@ -35,15 +35,6 @@ private:
         artist
         durationMs
 */
-class MetainfoGetter {
-public:
-    using MapT = std::unordered_map<std::string, std::string>;
-    MetainfoGetter(const std::filesystem::path& path);
-    inline const MapT& get() const { return metainfo; }
-private:
-    MapT metainfo;
-};
-
-static std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path);
+std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path);
 
 #endif // TAGSCOUT_H
