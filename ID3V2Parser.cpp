@@ -10,11 +10,12 @@ uint32_t syncSafe(uint32_t n) {
 
 tag::id3v2::ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     if (!checkFile(fs)) {
+        // leaving fs in state, convenient for later work (on actual audio data)
         throw InvalidTagException{};
     }
     //while (true) {
         if (extractHeader(fs)) {
-            throw InvalidTagException{};
+            //throw InvalidTagException{};
         }
         /*if (auto iter = _frames.find("SEEK"); iter != _frames.end()) {
             if (iter->second.size != 4) {
@@ -36,6 +37,7 @@ tag::id3v2::ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     bool error = extractFrames(fs);
     // leaving fs in state, convenient for later work (on actual audio data)
     fs.seekg((hasFooter() ? 20 : 10) + _size, std::ios_base::beg);
+    skipPadding(fs);
     if (error) {
         throw InvalidTagException{};
     }
@@ -68,7 +70,7 @@ std::vector<std::string> tag::id3v2::ID3V2Extractor::frameTitles() const {
 }
 
 bool tag::id3v2::ID3V2Extractor::checkFile(std::ifstream& fs) {
-    char data[5];
+    uint8_t data[5];
     fs.read((char*)&data, sizeof(data));
     _version = data[3];
 
@@ -83,10 +85,14 @@ bool tag::id3v2::ID3V2Extractor::checkFile(std::ifstream& fs) {
     if (!valid) {
         if ((data[0] == 0xff && ((data[1] & 0b11100000) == 0b11100000)) || (data[0] == 0x00)) {
             // sync bytes or some padding
+            fs.seekg(0);
+            skipPadding(fs);
             throw NoTagException{};
         }
         else if (!(data[0] == 0x49 && data[1] == 0x44 && data[2] == 0x33)) {
             // not id3 tag at all, but may be tag of some other type
+            fs.seekg(0);
+            skipPadding(fs);
             throw UnknownTagException{};
         }
         if (data[3] != 0x02 && data[3] != 0x03 && data[3] != 0x04) {
@@ -169,10 +175,40 @@ int tag::id3v2::ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
     return frame.size;
 }
 
+void tag::id3v2::ID3V2Extractor::skipPadding(std::ifstream& fs) {
+    uint8_t byte = 0;
+    while (!byte && fs) {
+        fs.read((char*)&byte, 1);
+    }
+    if (byte) {
+        fs.seekg((size_t)fs.tellg() - 1);
+    }
+}
+
 tag::id3v2::ID3V2Parser::ID3V2Parser(std::ifstream& fs)
 {
-    extractor = std::shared_ptr<Extractor>(new ID3V2Extractor(fs));
-    _durationMs = mp3::getMp3FileDuration(fs);
+    try {
+        extractor = std::shared_ptr<Extractor>(new ID3V2Extractor(fs));
+    }
+    // recoverable errors - still try to find duration
+    catch (NoTagException&) {
+        // not a error, just no tag
+    }
+    catch (UnknownTagException&) {
+        // not a error, just unknown tag
+    }
+    catch (InvalidTagException&) {
+        // tag is invalid, but some data may be ok
+    }
+    try {
+        _durationMs = mp3::getMp3FileDuration(fs);
+    }
+    catch (mp3::Mp3FrameParser::EOFException&) {
+        // just EOF of mp3 frame data
+    }
+    catch (mp3::Mp3FrameParser::NoFrameException&) {
+        ;
+    }
 }
 
 std::string tag::id3v2::ID3V2Parser::songTitle() {

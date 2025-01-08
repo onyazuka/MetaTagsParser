@@ -111,23 +111,34 @@ std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::
     }
     auto extension = path.extension();
     if (!(extension == ".mp3" || extension == ".flac")) {
-        throw NoTagException{};
+        return {};
     }
     std::ifstream ifs(path, std::ios_base::binary);
     if (!ifs) {
-        throw NoTagException{};
+        return {};
     }
-    std::unique_ptr<Tag> parser;
-    if (extension == ".mp3"){
-        parser.reset(new ID3V2Parser(ifs));
+    try {
+        std::unique_ptr<Tag> parser;
+        try {
+            if (extension == ".mp3"){
+                parser.reset(new ID3V2Parser(ifs));
+            }
+            else {
+                parser.reset(new FlacTagParser(ifs));
+            }
+        }
+        catch (...) {}
+        if (!parser) {
+            return {};
+        }
+        std::unordered_map<std::string, std::string> metainfo;
+        metainfo["title"] = parser->songTitle();
+        metainfo["album"] = parser->album();
+        metainfo["artist"] = parser->artist();
+        metainfo["durationMs"] = std::to_string(parser->durationMs());
+        return metainfo;
     }
-    else {
-        parser.reset(new FlacTagParser(ifs));
+    catch (...) {
+        return {};
     }
-    std::unordered_map<std::string, std::string> metainfo;
-    metainfo["title"] = parser->songTitle();
-    metainfo["album"] = parser->album();
-    metainfo["artist"] = parser->artist();
-    metainfo["durationMs"] = std::to_string(parser->durationMs());
-    return metainfo;
 }

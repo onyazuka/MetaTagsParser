@@ -49,6 +49,7 @@ namespace tag {
             int extractFramesFooter(std::ifstream& fs);
             int extractFrame(std::ifstream& fs);
             int extractFrameV22(std::ifstream& fs);
+            void skipPadding(std::ifstream& fs);
             Frames _frames;
             uint8_t _flags = 0;
             uint32_t _size = 0;
@@ -80,6 +81,9 @@ namespace tag {
 
         template<typename ReaderType>
         typename ReaderType::ResultType ID3V2Parser::readFrame(const std::string& frameName) {
+            if (!extractor) {
+                return {};
+            }
             auto frames = extractor->framesData(frameName);
             if (frames.empty()) return {};
             auto [data, size] = frames.front();
@@ -91,6 +95,9 @@ namespace tag {
 
         template<typename ReaderType>
         std::list<typename ReaderType::ResultType> ID3V2Parser::readFrames(const std::string& frameName) {
+            if (!extractor) {
+                return {};
+            }
             auto frames = extractor->framesData(frameName);
             std::list<typename ReaderType::ResultType> res;
             for (auto& [data, size] : frames) {
