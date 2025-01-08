@@ -1,10 +1,14 @@
 #ifndef TAGSCOUT_H
 #define TAGSCOUT_H
 #include <map>
+#include <unordered_map>
 #include <string>
 #include <filesystem>
 #include <list>
 
+/*
+    for testing purposes
+*/
 class TagScout {
 public:
     using MapT = std::map<std::string, std::list<std::string>>;
@@ -21,5 +25,25 @@ private:
     MapT framePathMap;
     std::map<std::string, size_t> songDurationMap;
 };
+
+/*
+    Class for extracting metainfo from a file.
+    Populates a metainfo map.
+    Keys:
+        title
+        album
+        artist
+        durationMs
+*/
+class MetainfoGetter {
+public:
+    using MapT = std::unordered_map<std::string, std::string>;
+    MetainfoGetter(const std::filesystem::path& path);
+    inline const MapT& get() const { return metainfo; }
+private:
+    MapT metainfo;
+};
+
+static std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path);
 
 #endif // TAGSCOUT_H

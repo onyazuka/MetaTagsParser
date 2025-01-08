@@ -101,3 +101,33 @@ void TagScout::dumpDurations(const std::filesystem::path& path) {
         ofs << duration << ": " << path << std::endl;
     }
 }
+
+
+
+std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path) {
+
+    if (!std::filesystem::is_regular_file(path)) {
+        throw NoTagException{};
+    }
+    auto extension = path.extension();
+    if (!(extension == ".mp3" || extension == ".flac")) {
+        throw NoTagException{};
+    }
+    std::ifstream ifs(path, std::ios_base::binary);
+    if (!ifs) {
+        throw NoTagException{};
+    }
+    std::unique_ptr<Tag> parser;
+    if (extension == ".mp3"){
+        parser.reset(new ID3V2Parser(ifs));
+    }
+    else {
+        parser.reset(new FlacTagParser(ifs));
+    }
+    std::unordered_map<std::string, std::string> metainfo;
+    metainfo["title"] = parser->songTitle();
+    metainfo["album"] = parser->album();
+    metainfo["artist"] = parser->artist();
+    metainfo["durationMs"] = std::to_string(parser->durationMs());
+    return metainfo;
+}
