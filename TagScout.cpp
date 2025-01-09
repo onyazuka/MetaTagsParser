@@ -1,5 +1,6 @@
 #include "TagScout.hpp"
 #include <fstream>
+#include <algorithm>
 #include "ID3V2Parser.hpp"
 #include "Mp3FrameParser.hpp"
 #include "FlacTagParser.hpp"
@@ -16,7 +17,8 @@ TagScout::TagScout(const std::filesystem::path& path) {
             if (!entry.is_regular_file()) {
                 continue;
             }
-            auto extension = entry.path().extension();
+            std::string extension = std::string(path.extension().c_str());
+            std::transform(extension.begin(), extension.end(), extension.begin(), [](char c){ return std::tolower(c); });
             if (!(extension == ".mp3" || extension == ".flac")) {
                 continue;
             }
@@ -109,7 +111,8 @@ std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::
     if (!std::filesystem::is_regular_file(path)) {
         throw NoTagException{};
     }
-    auto extension = path.extension();
+    std::string extension = std::string(path.extension().c_str());
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](char c){ return std::tolower(c); });
     if (!(extension == ".mp3" || extension == ".flac")) {
         return {};
     }

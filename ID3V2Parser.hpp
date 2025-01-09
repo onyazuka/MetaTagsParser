@@ -43,17 +43,21 @@ namespace tag {
             std::list<std::pair<Extractor::Data, size_t>> framesData(const std::string& frameName) override;
             std::vector<std::string> frameTitles() const override;
         private:
+            void init(std::ifstream& fs);
             bool checkFile(std::ifstream& fs);
             int extractHeader(std::ifstream& fs);
+            size_t extractSize(std::ifstream& fs);
             int extractFrames(std::ifstream& fs);
             int extractFramesFooter(std::ifstream& fs);
             int extractFrame(std::ifstream& fs);
             int extractFrameV22(std::ifstream& fs);
             void skipPadding(std::ifstream& fs);
+            void syncLookup(std::ifstream& fs);
             Frames _frames;
             uint8_t _flags = 0;
             uint32_t _size = 0;
             uint8_t _version = 0;
+            size_t fileSize = 0;
         };
 
 

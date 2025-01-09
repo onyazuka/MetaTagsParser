@@ -9,15 +9,25 @@ uint32_t syncSafe(uint32_t n) {
 }
 
 tag::id3v2::ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
+    size_t offset = fs.tellg();
+    fs.seekg(0, std::ios_base::end);
+    fileSize = fs.tellg();
+    fs.seekg(offset, std::ios_base::beg);
+    init(fs);
+}
+
+void tag::id3v2::ID3V2Extractor::init(std::ifstream& fs) {
     if (!checkFile(fs)) {
         // leaving fs in state, convenient for later work (on actual audio data)
+        skipPadding(fs);
+        syncLookup(fs);
         throw InvalidTagException{};
     }
     //while (true) {
-        if (extractHeader(fs)) {
-            //throw InvalidTagException{};
-        }
-        /*if (auto iter = _frames.find("SEEK"); iter != _frames.end()) {
+    if (extractHeader(fs)) {
+        //throw InvalidTagException{};
+    }
+    /*if (auto iter = _frames.find("SEEK"); iter != _frames.end()) {
             if (iter->second.size != 4) {
                 throw std::runtime_error("invalid file");
             }
@@ -38,6 +48,7 @@ tag::id3v2::ID3V2Extractor::ID3V2Extractor(std::ifstream& fs) {
     // leaving fs in state, convenient for later work (on actual audio data)
     fs.seekg((hasFooter() ? 20 : 10) + _size, std::ios_base::beg);
     skipPadding(fs);
+    syncLookup(fs);
     if (error) {
         throw InvalidTagException{};
     }
@@ -93,6 +104,7 @@ bool tag::id3v2::ID3V2Extractor::checkFile(std::ifstream& fs) {
             // not id3 tag at all, but may be tag of some other type
             fs.seekg(0);
             skipPadding(fs);
+            syncLookup(fs);
             throw UnknownTagException{};
         }
         if (data[3] != 0x02 && data[3] != 0x03 && data[3] != 0x04) {
@@ -104,10 +116,16 @@ bool tag::id3v2::ID3V2Extractor::checkFile(std::ifstream& fs) {
 
 int tag::id3v2::ID3V2Extractor::extractHeader(std::ifstream& fs) {
     fs.read((char*)&_flags, 1);
-    fs.read((char*)&_size, 4);
-    _size = swapBytes<uint32_t>(_size);
-    _size = syncSafe(_size);
+    _size = extractSize(fs);
     return 0;
+}
+
+size_t tag::id3v2::ID3V2Extractor::extractSize(std::ifstream& fs) {
+    size_t size = 0;
+    fs.read((char*)&size, 4);
+    size = swapBytes<uint32_t>(size);
+    size = syncSafe(size);
+    return size;
 }
 
 int tag::id3v2::ID3V2Extractor::extractFrames(std::ifstream& fs) {
@@ -145,6 +163,9 @@ int tag::id3v2::ID3V2Extractor::extractFrame(std::ifstream& fs) {
     if (frame.size == 0) {
         return frame.size;
     }
+    if (frame.size > (fileSize - fs.tellg())) {
+        return 0;
+    }
     // in id3v2.4 size of frame is also SYNCSAFE, like header (but NOT like frame size in id3v2.3)
     if (_version == 4) {
         frame.size = syncSafe(frame.size);
@@ -169,6 +190,9 @@ int tag::id3v2::ID3V2Extractor::extractFrameV22(std::ifstream& fs) {
     if (frame.size == 0) {
         return frame.size;
     }
+    if (frame.size > (fileSize - fs.tellg())) {
+        return 0;
+    }
     frame.data = Data(new uint8_t[frame.size]);
     fs.read((char*)frame.data.get(), frame.size);
     _frames[std::string(&ID[0], sizeof(ID))].push_back(std::move(frame));
@@ -183,6 +207,78 @@ void tag::id3v2::ID3V2Extractor::skipPadding(std::ifstream& fs) {
     if (byte) {
         fs.seekg((size_t)fs.tellg() - 1);
     }
+}
+
+/*
+    looking for sync seq (13 or more sequential 1 bytes)
+    handling known kinds of data (not equal to sync seq) (RIFF, another ID3 tag...)
+    returns true if something was skipped
+*/
+void tag::id3v2::ID3V2Extractor::syncLookup(std::ifstream& fs) {
+    static constexpr size_t SyncLookupSize = 4096;
+    size_t remainFsize = 0;
+    size_t initOffset = fs.tellg();
+    remainFsize = fileSize - initOffset;
+    uint8_t buf[4];
+    // sync seq not found - giving up
+    if (!(remainFsize > 2)) {
+        return;
+    }
+    fs.read((char*)&buf[0], 2);
+    // sync seq is next - ok
+    if (buf[0] == 0xff && (buf[1] & 0b11100000)) {
+        fs.seekg(initOffset);
+        return;
+    }
+    // suspect one more ID3 tag - JUST SKIPPING IT for now
+    if (buf[0] == 'I' && buf[1] == 'D' && remainFsize >= 3) {
+        fs.read((char*)&buf[2], 1);
+        if (buf[2] == '3') {
+            // ID3 tag
+            // skip version and flags
+            fs.seekg((size_t)fs.tellg() + 3);
+            size_t size = extractSize(fs);
+            fs.seekg((size_t)fs.tellg() + size);
+            skipPadding(fs);
+            // can be more to skip
+            syncLookup(fs);
+            return;
+        }
+    }
+    // suspect RIFF
+    else if (buf[0] == 'R' && buf[1] == 'I' && remainFsize >= 4) {
+        fs.read((char*)&buf[2], 2);
+        if (buf[2] == 'F' && buf[3] == 'F') {
+            // RIFF found
+            uint8_t RIFFBuf[SyncLookupSize];
+            fs.read((char*)&RIFFBuf[0], std::min(remainFsize - 4, SyncLookupSize));
+            for(size_t i = 0; i < SyncLookupSize - 1; ++i) {
+                if ((RIFFBuf[i] == 0xff) && ((RIFFBuf[i + 1] & 0b11100000) == 0b11100000)) {
+                    fs.seekg(initOffset + 4 + i);
+                    return;
+                }
+            }
+            // not found sync seq in RIFFLookupSize bytes - returning to initial offset
+            fs.seekg(initOffset);
+            return;
+        }
+    }
+    // something else - try to find sync seq
+    else {
+        uint8_t dataBuf[SyncLookupSize];
+        fs.read((char*)&dataBuf[0], std::min(remainFsize - 2, SyncLookupSize));
+        for(size_t i = 0; i < SyncLookupSize - 1; ++i) {
+            if ((dataBuf[i] == 0xff) && ((dataBuf[i + 1] & 0b11100000) == 0b11100000)) {
+                fs.seekg(initOffset + 2 + i);
+                return;
+            }
+        }
+        // not found sync seq in RIFFLookupSize bytes - returning to initial offset
+        fs.seekg(initOffset);
+        return;
+    }
+    fs.seekg(initOffset);
+    return;
 }
 
 tag::id3v2::ID3V2Parser::ID3V2Parser(std::ifstream& fs)

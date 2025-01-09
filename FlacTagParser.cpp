@@ -172,5 +172,5 @@ size_t tag::flac::FlacTagParser::durationMs() {
     if (!streamInfo.sampleRate) {
         return 0;
     }
-    return streamInfo.totalSamples / streamInfo.sampleRate;
+    return streamInfo.totalSamples / streamInfo.sampleRate * 1000;
 }
