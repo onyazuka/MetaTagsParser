@@ -141,7 +141,7 @@ size_t mp3::getMp3FileDuration(std::ifstream& ifs) {
             }
         }
     }
-    catch(Mp3FrameParser::EOFException) {
+    catch(Mp3FrameParser::EOFException&) {
         ;
     }
     return durationMs;

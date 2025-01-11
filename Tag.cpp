@@ -45,7 +45,7 @@ std::string tag::decodeStr(uint8_t* data, size_t sz, Encoding encoding) {
     case Encoding::Utf8:
         return Tag::asUtf8String_utf8(data, sz);
     default:
-        ;
+        return "";
     }
 }
 
