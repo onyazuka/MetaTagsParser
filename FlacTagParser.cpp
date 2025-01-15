@@ -112,14 +112,18 @@ std::unordered_map<std::string, std::string> tag::flac::FlacTagParser::VorbisCom
     return res;
 }
 
-PictureReader::ResultType tag::flac::FlacTagParser::Picture() {
-    auto [frameData, frameSize] = extractor->frameData("PICTURE");
-    if (!frameData || !frameSize) {
-        return {};
+std::list<PictureReader::ResultType> tag::flac::FlacTagParser::Picture() {
+    auto pictures = extractor->framesData("PICTURE");
+    std::list<PictureReader::ResultType> res;
+    for (auto [frameData, frameSize] : pictures) {
+        if (!frameData || !frameSize) {
+            continue;
+        }
+        DataBlock data(frameData.get(), frameSize);
+        data.encoding = Encoding::Utf8;
+        res.push_back(PictureReader().read(data));
     }
-    DataBlock data(frameData.get(), frameSize);
-    data.encoding = Encoding::Utf8;
-    return PictureReader().read(data);
+    return res;
 }
 
 tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo() {
@@ -141,16 +145,31 @@ tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo()
 }
 
 std::string tag::flac::FlacTagParser::songTitle() {
-    if (auto iter = vorbis.find("TITLE"); iter != vorbis.end()) {
-        return iter->second;
-    }
-    else {
-        return "";
-    }
+    return textual("TITLE");
 }
 
 std::string tag::flac::FlacTagParser::album() {
-    if (auto iter = vorbis.find("ALBUM"); iter != vorbis.end()) {
+    return textual("ALBUM");
+}
+
+std::string tag::flac::FlacTagParser::artist() {
+    return textual("ARTIST");
+}
+
+std::string tag::flac::FlacTagParser::year() {
+    return textual("YEAR");
+}
+
+std::string tag::flac::FlacTagParser::trackNumber() {
+    return textual("TRACKNUMBER");
+}
+
+std::string tag::flac::FlacTagParser::comment() {
+    return textual("DESCRIPTION");
+}
+
+std::string tag::flac::FlacTagParser::textual(const std::string& name) {
+    if (auto iter = vorbis.find(name); iter != vorbis.end()) {
         return iter->second;
     }
     else {
@@ -158,13 +177,13 @@ std::string tag::flac::FlacTagParser::album() {
     }
 }
 
-std::string tag::flac::FlacTagParser::artist() {
-    if (auto iter = vorbis.find("ARTIST"); iter != vorbis.end()) {
-        return iter->second;
+std::vector<tag::user::APICUserData> tag::flac::FlacTagParser::image() {
+    auto images = Picture();
+    std::vector<tag::user::APICUserData> res;
+    for (auto& image : images) {
+        res.push_back({(user::ImageType)std::get<0>(image), std::get<2>(image), std::get<10>(image)});
     }
-    else {
-        return "";
-    }
+    return res;
 }
 
 size_t tag::flac::FlacTagParser::durationMs() {

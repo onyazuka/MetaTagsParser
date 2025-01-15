@@ -85,12 +85,17 @@ namespace tag {
             FlacTagParser(std::ifstream& fs);
             VorbisCommentReader::ResultType VorbisComment();
             std::unordered_map<std::string, std::string> VorbisCommentMap();
-            PictureReader::ResultType Picture();
+            std::list<PictureReader::ResultType> Picture();
             StreamInfoDescr StreamInfo();
 
             std::string songTitle() override;
             std::string album() override;
             std::string artist() override;
+            std::string year() override;
+            std::string trackNumber() override;
+            std::string comment() override;
+            std::string textual(const std::string& name);
+            std::vector<user::APICUserData> image() override;
             size_t durationMs() override;
         private:
             std::unordered_map<std::string, std::string> vorbis;

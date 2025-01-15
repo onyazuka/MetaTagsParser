@@ -319,6 +319,31 @@ std::string tag::id3v2::ID3V2Parser::artist() {
     return std::get<1>(Textual("TPE1"));
 }
 
+std::string tag::id3v2::ID3V2Parser::year() {
+    return std::get<1>(Textual("TYER"));
+}
+
+std::string tag::id3v2::ID3V2Parser::trackNumber() {
+    return std::get<1>(Textual("TRCK"));
+}
+
+std::string tag::id3v2::ID3V2Parser::comment() {
+    auto comment = COMM();
+    if (comment.empty()) {
+        return "";
+    }
+    return std::get<3>(comment.front());
+}
+
+std::vector<tag::user::APICUserData> tag::id3v2::ID3V2Parser::image() {
+    auto images = APIC();
+    std::vector<tag::user::APICUserData> res;
+    for (auto& image : images) {
+        res.push_back({(user::ImageType)std::get<2>(image), std::get<1>(image), std::get<4>(image)});
+    }
+    return res;
+}
+
 size_t tag::id3v2::ID3V2Parser::durationMs() {
     return _durationMs;
 }

@@ -74,6 +74,10 @@ namespace tag {
             std::string songTitle() override;
             std::string album() override;
             std::string artist() override;
+            std::string year() override;
+            std::string trackNumber() override;
+            std::string comment() override;
+            std::vector<user::APICUserData> image() override;
             size_t durationMs() override;
 
             template<typename ReaderType>

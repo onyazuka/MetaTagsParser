@@ -1,9 +1,6 @@
 #include "TagScout.hpp"
 #include <fstream>
 #include <algorithm>
-#include "ID3V2Parser.hpp"
-#include "Mp3FrameParser.hpp"
-#include "FlacTagParser.hpp"
 
 namespace fs = std::filesystem;
 using namespace tag::id3v2;
@@ -106,7 +103,7 @@ void TagScout::dumpDurations(const std::filesystem::path& path) {
 
 
 
-std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path) {
+std::unordered_map<std::string, MetainfoData> getMetainfo(const std::filesystem::path& path, const GetMetaInfoConfig& config) {
 
     if (!std::filesystem::is_regular_file(path)) {
         throw NoTagException{};
@@ -134,11 +131,21 @@ std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::
         if (!parser) {
             return {};
         }
-        std::unordered_map<std::string, std::string> metainfo;
-        metainfo["title"] = parser->songTitle();
-        metainfo["album"] = parser->album();
-        metainfo["artist"] = parser->artist();
-        metainfo["durationMs"] = std::to_string(parser->durationMs());
+        std::unordered_map<std::string, MetainfoData> metainfo;
+        if (config.textual) {
+            metainfo["title"] = parser->songTitle();
+            metainfo["album"] = parser->album();
+            metainfo["artist"] = parser->artist();
+            metainfo["year"] = parser->year();
+            metainfo["trackNumber"] = parser->trackNumber();
+            metainfo["comment"] = parser->comment();
+        }
+        if (config.duration) {
+            metainfo["durationMs"] = std::to_string(parser->durationMs());
+        }
+        if (config.images) {
+            metainfo["images"] = parser->image();
+        }
         return metainfo;
     }
     catch (...) {

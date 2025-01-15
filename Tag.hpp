@@ -140,6 +140,43 @@ namespace tag {
 
     using Byte = Bytes<uint8_t, LittleEndian>;
 
+
+
+    namespace user {
+
+        enum ImageType{
+            Other,
+            FileIcon32x32PNG,
+            GeneralFileIcon,
+            FrontCover,
+            BackCover,
+            LinearNotesPage,
+            MediaLabel,
+            LeadArtist,
+            Artist,
+            Conductor,
+            Band,
+            Composer,
+            Lyricist,
+            RecordingLocation,
+            DuringRecording,
+            DuringPerformance,
+            ScreenCapture,
+            BrightColoredFish,
+            Illustration,
+            ArtistLogo,
+            StudioLogo
+        };
+
+        struct APICUserData {
+            // type of image (cover,
+            ImageType type;
+            std::string mimeType;
+            BinaryData::Data data;
+        };
+    }
+
+
     template<typename... Args>
     struct FrameReader {
         using ResultType = std::tuple<typename Args::Data...>;
@@ -184,6 +221,10 @@ namespace tag {
         virtual std::string songTitle() = 0;
         virtual std::string album() = 0;
         virtual std::string artist() = 0;
+        virtual std::string year() = 0;
+        virtual std::string trackNumber() = 0;
+        virtual std::string comment() = 0;
+        virtual std::vector<user::APICUserData> image() = 0;
         virtual size_t durationMs()  = 0;
     protected:
         std::shared_ptr<Extractor> extractor;

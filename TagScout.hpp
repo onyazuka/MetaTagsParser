@@ -5,6 +5,10 @@
 #include <string>
 #include <filesystem>
 #include <list>
+#include <variant>
+#include "ID3V2Parser.hpp"
+#include "Mp3FrameParser.hpp"
+#include "FlacTagParser.hpp"
 
 /*
     for testing purposes
@@ -32,9 +36,17 @@ private:
     Keys:
         title
         album
-        artist
+        artist,
+        images
         durationMs
 */
-std::unordered_map<std::string, std::string> getMetainfo(const std::filesystem::path& path);
+using MetainfoData = std::variant<std::string, std::vector<tag::user::APICUserData>>;
+struct GetMetaInfoConfig {
+    bool textual;
+    bool duration;
+    bool images;
+};
+
+std::unordered_map<std::string, MetainfoData> getMetainfo(const std::filesystem::path& path, const GetMetaInfoConfig& config);
 
 #endif // TAGSCOUT_H
