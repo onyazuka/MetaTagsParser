@@ -137,9 +137,7 @@ tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo()
     streamInfo.minimumBlockSizeInSamples = swapBytes(streamInfoRaw.minimumBlockSizeInSamples);
     streamInfo.maximumBlockSizeInSamples = swapBytes(streamInfoRaw.maximumBlockSizeInSamples);
     streamInfo.minimumFrameSizeInBytes = swapBytes<uint32_t, 3>(streamInfoRaw.minimumFrameSizeInBytes);
-    // FIX THIS ON LINUX!!!
-    uint32_t val = (streamInfoRaw.maximumFrameSizeInBytes1 << 16) | streamInfoRaw.maximumFrameSizeInBytes2;
-    streamInfo.maximumFrameSizeInBytes = swapBytes<uint32_t, 3>(val);
+    streamInfo.maximumFrameSizeInBytes = (streamInfoRaw.maximumFrameSizeInBytes1 << 16) | swapBytes<uint16_t>(streamInfoRaw.maximumFrameSizeInBytes2);
     streamInfo.sampleRate = ((uint32_t)swapBytes(streamInfoRaw.sampleRate1) << 4) | ((uint32_t)streamInfoRaw.sampleRate2);
     streamInfo.channels = streamInfoRaw.channels;
     streamInfo.bitsPerSample = (streamInfoRaw.bitsPerSample1 << 4) | streamInfoRaw.bitsPerSample2;

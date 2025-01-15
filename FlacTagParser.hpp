@@ -31,14 +31,12 @@ namespace tag {
                 Count
             };
             static const std::array<std::string, (size_t)BlockType::Count> BlockTypeStrMap;
-#pragma pack(push, 1)
-            struct FrameHeader {
+            struct_packed_begin(FrameHeader)
                 uint8_t blockType : 7;
                 uint8_t lastMetadataBlockFlag : 1;
                 uint32_t size : 24;
                 uint32_t garbage : 8;
-            };
-#pragma pack(pop)
+            struct_packed_end;
             struct Frame {
                 FrameHeader header;
                 Data data;
