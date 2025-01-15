@@ -14,7 +14,7 @@ TagScout::TagScout(const std::filesystem::path& path) {
             if (!entry.is_regular_file()) {
                 continue;
             }
-            std::string extension = std::string(path.extension().c_str());
+            std::string extension = path.extension().string();
             std::transform(extension.begin(), extension.end(), extension.begin(), [](char c){ return std::tolower(c); });
             if (!(extension == ".mp3" || extension == ".flac")) {
                 continue;
@@ -37,11 +37,11 @@ TagScout::TagScout(const std::filesystem::path& path) {
                 /*if (extractor.version() == 4) {
                     framePathMap["v4"].push_back(entry.path().string());
                 }*/
-                songDurationMap[entry.path()] = getMp3FileDuration(ifs);
+                songDurationMap[entry.path().string()] = getMp3FileDuration(ifs);
             }
             else {
                 auto p = dynamic_cast<FlacTagParser*>(parser.get());
-                songDurationMap[entry.path()] = p->StreamInfo().totalSamples / p->StreamInfo().sampleRate;
+                songDurationMap[entry.path().string()] = p->StreamInfo().totalSamples / p->StreamInfo().sampleRate;
             }
 
             /*mp3::Mp3FrameParser mp3FrameParser(ifs);
@@ -108,7 +108,7 @@ std::unordered_map<std::string, MetainfoData> getMetainfo(const std::filesystem:
     if (!std::filesystem::is_regular_file(path)) {
         throw NoTagException{};
     }
-    std::string extension = std::string(path.extension().c_str());
+    std::string extension = path.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(), [](char c){ return std::tolower(c); });
     if (!(extension == ".mp3" || extension == ".flac")) {
         return {};

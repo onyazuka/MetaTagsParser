@@ -69,7 +69,8 @@ int tag::flac::FlacTagExtractor::extractFrames(std::ifstream& fs) {
 
 tag::flac::FlacTagExtractor::Frame tag::flac::FlacTagExtractor::extractFrame(std::ifstream& fs) {
     Frame frame;
-    fs.read((char*)&frame.header, sizeof(FrameHeader));
+    // can't use sizeof(Header) and must use hardcode, because of MSVC and it's alignment pervercies even with pragma pack
+    fs.read((char*)&frame.header, 4);
     frame.header.size = ((frame.header.size & 0xff) << 16) | ((frame.header.size & 0xff00)) | ((frame.header.size & 0xff0000) >> 16);
     frame.data = Data(new uint8_t[frame.header.size]);
     fs.read((char*)frame.data.get(), frame.header.size);
@@ -136,7 +137,9 @@ tag::flac::FlacTagParser::StreamInfoDescr tag::flac::FlacTagParser::StreamInfo()
     streamInfo.minimumBlockSizeInSamples = swapBytes(streamInfoRaw.minimumBlockSizeInSamples);
     streamInfo.maximumBlockSizeInSamples = swapBytes(streamInfoRaw.maximumBlockSizeInSamples);
     streamInfo.minimumFrameSizeInBytes = swapBytes<uint32_t, 3>(streamInfoRaw.minimumFrameSizeInBytes);
-    streamInfo.maximumFrameSizeInBytes = swapBytes<uint32_t, 3>(streamInfoRaw.maximumFrameSizeInBytes);
+    // FIX THIS ON LINUX!!!
+    uint32_t val = (streamInfoRaw.maximumFrameSizeInBytes1 << 16) | streamInfoRaw.maximumFrameSizeInBytes2;
+    streamInfo.maximumFrameSizeInBytes = swapBytes<uint32_t, 3>(val);
     streamInfo.sampleRate = ((uint32_t)swapBytes(streamInfoRaw.sampleRate1) << 4) | ((uint32_t)streamInfoRaw.sampleRate2);
     streamInfo.channels = streamInfoRaw.channels;
     streamInfo.bitsPerSample = (streamInfoRaw.bitsPerSample1 << 4) | streamInfoRaw.bitsPerSample2;

@@ -8,8 +8,8 @@
 #define struct_packed_begin(name) struct __attribute__ ((packed)) name {
 #define struct_packed_end }
 #elif _MSC_VER
-#define struct_packed_begin(name) #pragma pack(push, 1) struct name {
-#define struct_packed_end } #pragma pack(pop)
+#define struct_packed_begin(name) __pragma(pack(push, 1)) struct name {
+#define struct_packed_end } __pragma(pack(pop))
 #endif
 
 namespace util {

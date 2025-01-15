@@ -31,11 +31,14 @@ namespace tag {
                 Count
             };
             static const std::array<std::string, (size_t)BlockType::Count> BlockTypeStrMap;
+#pragma pack(push, 1)
             struct FrameHeader {
                 uint8_t blockType : 7;
                 uint8_t lastMetadataBlockFlag : 1;
                 uint32_t size : 24;
+                uint32_t garbage : 8;
             };
+#pragma pack(pop)
             struct Frame {
                 FrameHeader header;
                 Data data;
@@ -61,7 +64,8 @@ namespace tag {
                 uint16_t minimumBlockSizeInSamples;
                 uint16_t maximumBlockSizeInSamples;
                 uint32_t minimumFrameSizeInBytes : 24;
-                uint32_t maximumFrameSizeInBytes : 24;
+                uint32_t maximumFrameSizeInBytes1 : 8;
+                uint16_t maximumFrameSizeInBytes2;
                 uint16_t sampleRate1;
                 uint8_t bitsPerSample1 : 1;
                 uint8_t channels : 3;
