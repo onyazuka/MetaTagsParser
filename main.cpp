@@ -6,10 +6,12 @@ using namespace std;
 #include "Mp3FrameParser.hpp"
 #include "TagScout.hpp"
 #include "FlacTagParser.hpp"
+#include "WavParser.hpp"
 
 using namespace util;
 using namespace tag::id3v2;
 using namespace tag::flac;
+using namespace tag::wav;
 using namespace mp3;
 
 void testUtfConverters() {
@@ -48,6 +50,17 @@ void testFlacExtractor() {
     cout << "ok" << endl;
 }
 
+void testWav() {
+    std::string path = "/home/onyazuka/sample.wav";
+    std::ifstream ifs(path, std::ios_base::binary);
+    if (!ifs) {
+        throw std::runtime_error("error opening file");
+    }
+    WavParser wav(ifs);
+    auto dur = wav.durationMs();
+    cout << "WAV duration is " << dur << endl;
+}
+
 void testParser() {
     testUtfConverters();
 }
@@ -58,9 +71,9 @@ auto getTsMcs() {
 
 int main()
 {
-
     testParser();
     testFlacExtractor();
+    testWav();
     /*auto before = getTsMcs();
     TagScout scout("/media/onyazuka/New SSD/music");
     const auto& map = scout.map();
@@ -69,6 +82,7 @@ int main()
     std::cout << "Elapsed: " << (after - before) << " mcs\n";*/
     /*scout.dump("/home/onyazuka/taginfo.txt");
     scout.dumpDurations("/home/onyazuka/durationinfo.txt");*/
+    auto meta = getMetainfo("/home/onyazuka/sample.wav", {true, true, true});
     try {
         std::string home = "/home/onyazuka/";
         std::string path = home + "鈴木このみ アスタロア.mp3";

@@ -9,6 +9,7 @@
 #include "ID3V2Parser.hpp"
 #include "Mp3FrameParser.hpp"
 #include "FlacTagParser.hpp"
+#include "WavParser.hpp"
 
 /*
     for testing purposes

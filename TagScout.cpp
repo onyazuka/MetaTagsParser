@@ -5,6 +5,7 @@
 namespace fs = std::filesystem;
 using namespace tag::id3v2;
 using namespace tag::flac;
+using namespace tag::wav;
 using namespace mp3;
 using namespace tag;
 
@@ -110,7 +111,8 @@ std::unordered_map<std::string, MetainfoData> getMetainfo(const std::filesystem:
     }
     std::string extension = path.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(), [](char c){ return std::tolower(c); });
-    if (!(extension == ".mp3" || extension == ".flac")) {
+    std::vector<std::string> supportedExtensions = {".mp3", ".flac", ".wav"};
+    if (!std::any_of(supportedExtensions.begin(), supportedExtensions.end(), [&extension](const auto& supExt){ return extension == supExt; })) {
         return {};
     }
     std::ifstream ifs(path, std::ios_base::binary);
@@ -123,8 +125,11 @@ std::unordered_map<std::string, MetainfoData> getMetainfo(const std::filesystem:
             if (extension == ".mp3"){
                 parser.reset(new ID3V2Parser(ifs));
             }
-            else {
+            else if (extension == ".flac") {
                 parser.reset(new FlacTagParser(ifs));
+            }
+            else {
+                parser.reset(new WavParser(ifs));
             }
         }
         catch (...) {}
